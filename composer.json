@@ -1,0 +1,27 @@
+{
+    "name": "acdh-oeaw/arche-ontology-api",
+    "type": "library",
+    "description": "An API providing commonly used views on the ARCHE ontology",
+    "keywords": [],
+    "homepage": "https://github.com/zozlak/acdh-repo-ontology",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Mateusz Żółtak",
+            "email": "mzoltak@oeaw.ac.at"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "acdhOeaw\\": "src/acdhOeaw"
+        }
+    },
+    "require": {
+        "php": ">= 7.1",
+        "zozlak/rdf-constants": ">= 0.2.0",
+        "acdh-oeaw/easyrdf": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^8.4"
+    }
+}
