@@ -102,4 +102,11 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertNull($o->getProperty($r2, 'https://foo/bar'));
     }
     
+    public function testPropertyDomainRange(): void {
+        $o = new Ontology(self::$pdo, 'https://vocabs.acdh.oeaw.ac.at/schema#%');        
+        $r = (new Graph())->resource('.');
+        $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasUpdatedDate');
+        $this->assertEquals('http://www.w3.org/2001/XMLSchema#date', $p->range);
+        $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject', $p->domain);
+    }
 }

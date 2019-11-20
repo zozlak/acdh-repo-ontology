@@ -190,21 +190,25 @@ class Ontology {
                     relations r 
                     JOIN t ON t.sid = r.id AND property = ?
             )
-            SELECT t.id, i1.ids AS property, t.type, i3.ids AS range, i4.ids AS domain, json_agg(i2.ids ORDER BY n DESC) AS properties 
+            SELECT 
+                t.id, 
+                i1.ids AS property, 
+                t.type, 
+                m3.value AS range, 
+                m4.value AS domain, 
+                json_agg(i2.ids ORDER BY n DESC) AS properties 
             FROM 
                 t 
                 JOIN identifiers i1 ON t.id = i1.id AND i1.ids LIKE ?
                 JOIN identifiers i2 ON t.sid = i2.id AND i2.ids LIKE ?
-                LEFT JOIN relations r3 ON t.sid = r3.id AND r3.property = ?
-                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids LIKE ?
-                LEFT JOIN relations r4 ON t.sid = r4.id AND r4.property = ?
-                LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids LIKE ?
+                JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
+                JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
             GROUP BY 1, 2, 3, 4, 5
         ";
         $param = [
             $nmspLike, RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
             RDF::RDFS_SUB_PROPERTY_OF, // with recursive term
-            $nmspLike, $nmspLike, RDF::RDFS_RANGE, $nmspLike, RDF::RDFS_DOMAIN, $nmspLike, // normal query
+            $nmspLike, $nmspLike, RDF::RDFS_RANGE, RDF::RDFS_DOMAIN, // normal query
         ];
         $query = $pdo->prepare($query);
         $query->execute($param);
@@ -218,10 +222,10 @@ class Ontology {
             SELECT 
                 t.id, 
                 t.ids AS class,
-                i9.ids AS onProperty,
-                coalesce(i1.ids, i2.ids) AS range,
-                coalesce(m7.value, m4.value, m6.value, m3.value) AS min,
-                coalesce(m8.value, m5.value, m6.value, m3.value) AS max
+                m1.value AS onProperty,
+                coalesce(m2.value, m3.value) AS range,
+                coalesce(m8.value, m5.value, m7.value, m4.value) AS min,
+                coalesce(m9.value, m6.value, m7.value, m4.value) AS max
             FROM
                 (
                     SELECT id, ids
@@ -233,25 +237,21 @@ class Ontology {
                         AND property = ?
                         AND value = ?
                 ) t
-                LEFT JOIN relations r1 ON t.id = r1.id AND r1.property = ?
-                LEFT JOIN identifiers i1 ON r1.target_id = i1.id AND i1.ids LIKE ?
-                LEFT JOIN relations r2 ON t.id = r2.id AND r1.property = ?
-                LEFT JOIN identifiers i2 ON r1.target_id = i2.id AND i2.ids LIKE ?
+                LEFT JOIN metadata m1 ON t.id = m1.id AND m1.property = ?
+                LEFT JOIN metadata m2 ON t.id = m2.id AND m2.property = ?
                 LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
                 LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
                 LEFT JOIN metadata m5 ON t.id = m5.id AND m5.property = ?
                 LEFT JOIN metadata m6 ON t.id = m6.id AND m6.property = ?
                 LEFT JOIN metadata m7 ON t.id = m7.id AND m7.property = ?
                 LEFT JOIN metadata m8 ON t.id = m8.id AND m8.property = ?            
-                LEFT JOIN relations r9 ON t.id = r9.id AND r9.property = ?
-                LEFT JOIN identifiers i9 ON r9.target_id = i9.id AND i9.ids LIKE ?
+                LEFT JOIN metadata m9 ON t.id = m9.id AND m9.property = ?
         ";
         $param = [
             $nmspLike, RDF::RDF_TYPE, RDF::OWL_RESTRICTION,
-            RDF::OWL_ON_CLASS, $nmspLike, RDF::OWL_ON_DATA_RANGE, $nmspLike,
-            RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY, RDF::OWL_MAX_CARDINALITY,
-            RDF::OWL_QUALIFIED_CARDINALITY, RDF::OWL_MIN_QUALIFIED_CARDINALITY, RDF::OWL_MAX_QUALIFIED_CARDINALITY,
-            RDF::OWL_ON_PROPERTY, $nmspLike,
+            RDF::OWL_ON_PROPERTY, RDF::OWL_ON_CLASS, RDF::OWL_ON_DATA_RANGE, // m1, m2, m3
+            RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY, RDF::OWL_MAX_CARDINALITY, // m4, m5, m6
+            RDF::OWL_QUALIFIED_CARDINALITY, RDF::OWL_MIN_QUALIFIED_CARDINALITY, RDF::OWL_MAX_QUALIFIED_CARDINALITY, // m7, m8, m9
         ];
         $query = $pdo->prepare($query);
         $query->execute($param);
