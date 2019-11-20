@@ -32,17 +32,9 @@ use zozlak\RdfConstants as RDF;
 
 /**
  * Provides an API for the ARCHE oontology.
- * 
- * Fetching full ontology (resolving class and property inheritance) from a 
- * triplestore is time consuming. At the same time the ontology changes rarely.
- * Thus caching is a perfect solution.
- * 
- * The ontology is cached in a JSON file (path is taken from the 
- * `repoConfig:ontologyCacheFile` config property). It is automatically refreshed
- * if the repository resource storing the ontology owl (as set in the
- * `repoConfig:ontologyResId`) modification date is newer then the cache file
- * modification time.
  *
+ * Maps the RDF ontology structure into the object model.
+ * 
  * @author zozlak
  */
 class Ontology {
@@ -133,7 +125,7 @@ class Ontology {
                 return $this->classes[$class]->properties[$property];
             }
         }
-        return null;
+        return $this->properties[$property] ?? null;
     }
 
     private function loadClasses(PDO $pdo, string $nmspLike): void {
