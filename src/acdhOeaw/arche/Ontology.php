@@ -174,6 +174,7 @@ class Ontology {
     }
 
     private function loadProperties(PDO $pdo, string $nmspLike): void {
+        // slightly more complex to deal with rdfs:range and rdfs:domain no matter if they are stored as relations or literals-like
         $query = "
             WITH RECURSIVE t(sid, id, type, n) AS (
                 SELECT DISTINCT id, id, value, 0
@@ -194,21 +195,27 @@ class Ontology {
                 t.id, 
                 i1.ids AS property, 
                 t.type, 
-                m3.value AS range, 
-                m4.value AS domain, 
+                coalesce(m3.value, i3.ids) AS range, 
+                coalesce(m4.value, i4.ids) AS domain, 
                 json_agg(i2.ids ORDER BY n DESC) AS properties 
             FROM 
                 t 
                 JOIN identifiers i1 ON t.id = i1.id AND i1.ids LIKE ?
                 JOIN identifiers i2 ON t.sid = i2.id AND i2.ids LIKE ?
-                JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
-                JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
+                LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
+                LEFT JOIN relations r3 ON t.id = r3.id AND r3.property = ?
+                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids LIKE ?
+                LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
+                LEFT JOIN relations r4 ON t.id = r4.id AND r4.property = ?
+                LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids LIKE ?
             GROUP BY 1, 2, 3, 4, 5
         ";
         $param = [
             $nmspLike, RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
             RDF::RDFS_SUB_PROPERTY_OF, // with recursive term
-            $nmspLike, $nmspLike, RDF::RDFS_RANGE, RDF::RDFS_DOMAIN, // normal query
+            $nmspLike, $nmspLike, // i1, i2
+            RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspLike, // m3, r3, i3
+            RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspLike, // m4, r4, i4
         ];
         $query = $pdo->prepare($query);
         $query->execute($param);
@@ -218,12 +225,13 @@ class Ontology {
     }
 
     private function loadRestrictions(PDO $pdo, string $nmspLike): void {
+        // slightly more complex to deal with owl:onDataRange and owl:onClass no matter if they are stored as relations or literals-like
         $query = "
             SELECT 
                 t.id, 
                 t.ids AS class,
                 m1.value AS onProperty,
-                coalesce(m2.value, m3.value) AS range,
+                coalesce(m2.value, i2.ids, m3.value, i3.ids) AS range,
                 coalesce(m8.value, m5.value, m7.value, m4.value) AS min,
                 coalesce(m9.value, m6.value, m7.value, m4.value) AS max
             FROM
@@ -239,7 +247,11 @@ class Ontology {
                 ) t
                 LEFT JOIN metadata m1 ON t.id = m1.id AND m1.property = ?
                 LEFT JOIN metadata m2 ON t.id = m2.id AND m2.property = ?
+                LEFT JOIN relations r2 ON t.id = r2.id AND r2.property = ?
+                LEFT JOIN identifiers i2 ON r2.target_id = i2.id AND i2.ids LIKE ?
                 LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
+                LEFT JOIN relations r3 ON t.id = r3.id AND r3.property = ?
+                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids LIKE ?
                 LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
                 LEFT JOIN metadata m5 ON t.id = m5.id AND m5.property = ?
                 LEFT JOIN metadata m6 ON t.id = m6.id AND m6.property = ?
@@ -249,7 +261,9 @@ class Ontology {
         ";
         $param = [
             $nmspLike, RDF::RDF_TYPE, RDF::OWL_RESTRICTION,
-            RDF::OWL_ON_PROPERTY, RDF::OWL_ON_CLASS, RDF::OWL_ON_DATA_RANGE, // m1, m2, m3
+            RDF::OWL_ON_PROPERTY, // m1
+            RDF::OWL_ON_CLASS, RDF::OWL_ON_CLASS, $nmspLike, // m2, r2, i2
+            RDF::OWL_ON_DATA_RANGE, RDF::OWL_ON_DATA_RANGE, $nmspLike, // m3, r3, i3
             RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY, RDF::OWL_MAX_CARDINALITY, // m4, m5, m6
             RDF::OWL_QUALIFIED_CARDINALITY, RDF::OWL_MIN_QUALIFIED_CARDINALITY, RDF::OWL_MAX_QUALIFIED_CARDINALITY, // m7, m8, m9
         ];
