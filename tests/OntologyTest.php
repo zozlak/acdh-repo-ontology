@@ -81,7 +81,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals(1, $c->properties[$pUri]->min);
         
         $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
-        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact';
+        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasNote';
         $this->assertArrayHasKey($pUri, $c->properties);
         $this->assertNull($c->properties[$pUri]->min);
     }
@@ -107,6 +107,6 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $r = (new Graph())->resource('.');
         $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasUpdatedDate');
         $this->assertEquals('http://www.w3.org/2001/XMLSchema#date', $p->range);
-        $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject', $p->domain);
+        $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/schema#Main', $p->domain);
     }
 }
