@@ -69,10 +69,10 @@ class Ontology {
      * 
      * @param Fedora $fedora repository connection object
      */
-    public function __construct(PDO $pdo, string $nmspLike) {
-        $this->loadClasses($pdo, $nmspLike);
-        $this->loadProperties($pdo, $nmspLike);
-        $this->loadRestrictions($pdo, $nmspLike);
+    public function __construct(PDO $pdo, string $nmspSkip) {
+        $this->loadClasses($pdo, $nmspSkip);
+        $this->loadProperties($pdo, $nmspSkip);
+        $this->loadRestrictions($pdo, $nmspSkip);
         $this->preprocess();
     }
 
@@ -128,7 +128,7 @@ class Ontology {
         return $this->properties[$property] ?? null;
     }
 
-    private function loadClasses(PDO $pdo, string $nmspLike): void {
+    private function loadClasses(PDO $pdo, string $nmspSkip): void {
         $query = "
             WITH RECURSIVE t(sid, id, n) AS (
                 SELECT DISTINCT id, id, 0
@@ -136,7 +136,7 @@ class Ontology {
                     identifiers
                     JOIN metadata USING (id)
                 WHERE
-                    ids LIKE ?
+                    ids NOT LIKE ?
                     AND property = ?
                     AND value = ?
               UNION
@@ -148,13 +148,13 @@ class Ontology {
             SELECT t.id, i1.ids AS class, json_agg(i2.ids ORDER BY n DESC) AS classes 
             FROM 
                 t 
-                JOIN identifiers i1 ON t.id = i1.id AND i1.ids LIKE ?
-                JOIN identifiers i2 ON t.sid = i2.id AND i2.ids LIKE ?
+                JOIN identifiers i1 ON t.id = i1.id AND i1.ids NOT LIKE ?
+                JOIN identifiers i2 ON t.sid = i2.id AND i2.ids NOT LIKE ?
             GROUP BY 1, 2
         ";
         $param = [
-            $nmspLike, RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::RDFS_SUB_CLASS_OF, // with
-            $nmspLike, $nmspLike // normal query
+            $nmspSkip, RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::RDFS_SUB_CLASS_OF, // with
+            $nmspSkip, $nmspSkip // normal query
         ];
         $query = $pdo->prepare($query);
         $query->execute($param);
@@ -173,7 +173,7 @@ class Ontology {
         }
     }
 
-    private function loadProperties(PDO $pdo, string $nmspLike): void {
+    private function loadProperties(PDO $pdo, string $nmspSkip): void {
         // slightly more complex to deal with rdfs:range and rdfs:domain no matter if they are stored as relations or literals-like
         $query = "
             WITH RECURSIVE t(sid, id, type, n) AS (
@@ -200,22 +200,22 @@ class Ontology {
                 json_agg(i2.ids ORDER BY n DESC) AS properties 
             FROM 
                 t 
-                JOIN identifiers i1 ON t.id = i1.id AND i1.ids LIKE ?
-                JOIN identifiers i2 ON t.sid = i2.id AND i2.ids LIKE ?
+                JOIN identifiers i1 ON t.id = i1.id AND i1.ids NOT LIKE ?
+                JOIN identifiers i2 ON t.sid = i2.id AND i2.ids NOT LIKE ?
                 LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
                 LEFT JOIN relations r3 ON t.id = r3.id AND r3.property = ?
-                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids LIKE ?
+                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids NOT LIKE ?
                 LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
                 LEFT JOIN relations r4 ON t.id = r4.id AND r4.property = ?
-                LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids LIKE ?
+                LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids NOT LIKE ?
             GROUP BY 1, 2, 3, 4, 5
         ";
         $param = [
-            $nmspLike, RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
+            $nmspSkip, RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
             RDF::RDFS_SUB_PROPERTY_OF, // with recursive term
-            $nmspLike, $nmspLike, // i1, i2
-            RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspLike, // m3, r3, i3
-            RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspLike, // m4, r4, i4
+            $nmspSkip, $nmspSkip, // i1, i2
+            RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspSkip, // m3, r3, i3
+            RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspSkip, // m4, r4, i4
         ];
         $query = $pdo->prepare($query);
         $query->execute($param);
@@ -224,13 +224,13 @@ class Ontology {
         }
     }
 
-    private function loadRestrictions(PDO $pdo, string $nmspLike): void {
+    private function loadRestrictions(PDO $pdo, string $nmspSkip): void {
         // slightly more complex to deal with owl:onDataRange and owl:onClass no matter if they are stored as relations or literals-like
         $query = "
             SELECT 
                 t.id, 
                 t.ids AS class,
-                m1.value AS onProperty,
+                coalesce(m1.value, i1.ids) AS onProperty,
                 coalesce(m2.value, i2.ids, m3.value, i3.ids) AS range,
                 coalesce(m8.value, m5.value, m7.value, m4.value) AS min,
                 coalesce(m9.value, m6.value, m7.value, m4.value) AS max
@@ -241,17 +241,19 @@ class Ontology {
                         identifiers
                         JOIN metadata USING (id)
                     WHERE 
-                        ids LIKE ?
+                        ids NOT LIKE ?
                         AND property = ?
                         AND value = ?
                 ) t
                 LEFT JOIN metadata m1 ON t.id = m1.id AND m1.property = ?
+                LEFT JOIN relations r1 ON t.id = r1.id AND r1.property = ?
+                LEFT JOIN identifiers i1 ON r1.target_id = i1.id AND i1.ids NOT LIKE ?
                 LEFT JOIN metadata m2 ON t.id = m2.id AND m2.property = ?
                 LEFT JOIN relations r2 ON t.id = r2.id AND r2.property = ?
-                LEFT JOIN identifiers i2 ON r2.target_id = i2.id AND i2.ids LIKE ?
+                LEFT JOIN identifiers i2 ON r2.target_id = i2.id AND i2.ids NOT LIKE ?
                 LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
                 LEFT JOIN relations r3 ON t.id = r3.id AND r3.property = ?
-                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids LIKE ?
+                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids NOT LIKE ?
                 LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
                 LEFT JOIN metadata m5 ON t.id = m5.id AND m5.property = ?
                 LEFT JOIN metadata m6 ON t.id = m6.id AND m6.property = ?
@@ -260,10 +262,10 @@ class Ontology {
                 LEFT JOIN metadata m9 ON t.id = m9.id AND m9.property = ?
         ";
         $param = [
-            $nmspLike, RDF::RDF_TYPE, RDF::OWL_RESTRICTION,
-            RDF::OWL_ON_PROPERTY, // m1
-            RDF::OWL_ON_CLASS, RDF::OWL_ON_CLASS, $nmspLike, // m2, r2, i2
-            RDF::OWL_ON_DATA_RANGE, RDF::OWL_ON_DATA_RANGE, $nmspLike, // m3, r3, i3
+            $nmspSkip, RDF::RDF_TYPE, RDF::OWL_RESTRICTION,
+            RDF::OWL_ON_PROPERTY, RDF::OWL_ON_PROPERTY, $nmspSkip, // m1, r1, i1
+            RDF::OWL_ON_CLASS, RDF::OWL_ON_CLASS, $nmspSkip, // m2, r2, i2
+            RDF::OWL_ON_DATA_RANGE, RDF::OWL_ON_DATA_RANGE, $nmspSkip, // m3, r3, i3
             RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY, RDF::OWL_MAX_CARDINALITY, // m4, m5, m6
             RDF::OWL_QUALIFIED_CARDINALITY, RDF::OWL_MIN_QUALIFIED_CARDINALITY, RDF::OWL_MAX_QUALIFIED_CARDINALITY, // m7, m8, m9
         ];

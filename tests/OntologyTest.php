@@ -49,64 +49,65 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testInit(): void {
-        $o = new Ontology(self::$pdo, 'https://vocabs.acdh.oeaw.ac.at/schema#%');
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
         $this->assertNotNull($o);
     }
 
     public function testClassInheritance(): void {
-        $o = new Ontology(self::$pdo, 'https://vocabs.acdh.oeaw.ac.at/schema#%');
-        
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
+
         $r1 = (new Graph())->resource('.');
         $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
         $this->assertTrue($o->isA($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
-        
+
         $r2 = (new Graph())->resource('.');
         $r2->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
-        $this->assertTrue($o->isA($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));        
-        
+        $this->assertTrue($o->isA($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
+
         $r3 = (new Graph())->resource('.');
         $r3->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Agent');
         $this->assertFalse($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
-        
+
         $r3->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject');
-        $this->assertTrue($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));        
+        $this->assertTrue($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
     }
 
     public function testCardinalitiesIndirect(): void {
-        $o = new Ontology(self::$pdo, 'https://vocabs.acdh.oeaw.ac.at/schema#%');
-        
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
+
+        $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
         $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact';
         $this->assertArrayHasKey($pUri, $c->properties);
         $this->assertEquals(1, $c->properties[$pUri]->min);
-        
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
+
+        $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
         $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasNote';
         $this->assertArrayHasKey($pUri, $c->properties);
         $this->assertNull($c->properties[$pUri]->min);
     }
-    
+
     public function testCardinalitiesDirect(): void {
-        $o = new Ontology(self::$pdo, 'https://vocabs.acdh.oeaw.ac.at/schema#%');
-        
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
+
         $r1 = (new Graph())->resource('.');
         $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p1 = $o->getProperty($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+        $p1 = $o->getProperty($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense');
         $this->assertEquals(1, $p1->min);
-        
+
         $r2 = (new Graph())->resource('.');
         $r2->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
         $p2 = $o->getProperty($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
         $this->assertNull($p2->min);
-        
+
         $this->assertNull($o->getProperty($r2, 'https://foo/bar'));
     }
-    
+
     public function testPropertyDomainRange(): void {
-        $o = new Ontology(self::$pdo, 'https://vocabs.acdh.oeaw.ac.at/schema#%');        
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
         $r = (new Graph())->resource('.');
         $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasUpdatedDate');
         $this->assertEquals('http://www.w3.org/2001/XMLSchema#date', $p->range);
         $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/schema#Main', $p->domain);
     }
+
 }
