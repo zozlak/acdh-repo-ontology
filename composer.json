@@ -1,9 +1,9 @@
 {
-    "name": "acdh-oeaw/arche-ontology-api",
+    "name": "acdh-oeaw/arche-lib-schema",
     "type": "library",
     "description": "An API providing commonly used views on the ARCHE ontology",
     "keywords": [],
-    "homepage": "https://github.com/zozlak/acdh-repo-ontology",
+    "homepage": "https://github.com/acdh-oeaw/arche-lib-schema",
     "license": "MIT",
     "authors": [
         {
