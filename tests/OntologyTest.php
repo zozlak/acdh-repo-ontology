@@ -129,4 +129,15 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals('Contact(s)', $p->label['en']);
     }
     
+    public function testPropertyByClassUri(): void {
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
+        $p = $o->getProperty('https://vocabs.acdh.oeaw.ac.at/schema#Collection', 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+        $this->assertEquals('Contact(s)', $p->label['en']);
+    }
+    
+    public function testPropertyWithoutClass(): void {
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
+        $p = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+        $this->assertEquals('Contact(s)', $p->label['en']);
+    }
 }

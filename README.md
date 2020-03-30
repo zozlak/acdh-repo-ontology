@@ -16,4 +16,11 @@ $ontology = new \acdhOeaw\arche\Ontology($conn, $baseUrl);
 
 $class = $ontology->getClass('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject');
 print_r($class);
+
+$property = $ontology->getProperty('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject', 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+print_r($property);
+
+$property = $ontology->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+print_r($property);
+
 ```

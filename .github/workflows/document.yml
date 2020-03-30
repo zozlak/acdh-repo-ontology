@@ -21,7 +21,8 @@ jobs:
     - name: commit docs
       run: |
         cd docsrepo
-        git status
+        ls -al
+        ls -al arche-lib-schema
         git config user.email "workflow@github.actions"
         git config user.name "Github Actions Workflow"
         git add arche-lib-schema/*

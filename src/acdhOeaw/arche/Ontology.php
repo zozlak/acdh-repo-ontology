@@ -106,18 +106,32 @@ class Ontology {
     }
 
     /**
-     * Returns a given property description for a given RDF resource.
+     * Returns a given property description for a given set of RDF classes or
+     * an RDF resource (in the latter case classes list is extracted from the
+     * resource).
      * 
-     * If property domain matches many resource classes, a description for first
+     * If property domain matches many classes, a description for first
      * encountered class is returned (property cardinality and range may vary
      * between classes).
      * 
-     * @param \EasyRdf\Resource $res RDF resource
+     * If no classes/RDF resource is provided all known classes are searched
+     * and a first encounterred match is returned (property cardinality and range may vary
+     * between classes).
+     * 
+     * @param $resOrClassesArray \EasyRdf\Resource RDF resource or an array of 
+     *   RDF class URIs or an RDF class URI
      * @param string $property property URI
      * @return \acdhOeaw\arche\PropertyDesc|null
      */
-    public function getProperty(Resource $res, string $property): ?PropertyDesc {
-        foreach ($res->allResources(RDF::RDF_TYPE) as $class) {
+    public function getProperty($resOrClassesArray, string $property): ?PropertyDesc {
+        if (empty($resOrClassesArray)) {
+            $resOrClassesArray = array_keys($this->classes);
+        } elseif ($resOrClassesArray instanceof Resource) {
+            $resOrClassesArray = $resOrClassesArray->allResources(RDF::RDF_TYPE);
+        } elseif (!is_array($resOrClassesArray)) {
+            $resOrClassesArray = [$resOrClassesArray];
+        }
+        foreach ($resOrClassesArray as $class) {
             $class = (string) $class;
             if (isset($this->classes[$class]) && isset($this->classes[$class]->properties[$property])) {
                 return $this->classes[$class]->properties[$property];
