@@ -33,13 +33,17 @@ namespace acdhOeaw\arche;
  */
 class BaseDesc {
 
+    /**
+     * 
+     * @param object $d
+     */
     public function __construct(object $d = null) {
         if ($d !== null) {
             foreach ($this as $k => $v) {
                 $dk = strtolower($k);
                 if (isset($d->$dk)) {
                     if (is_array($this->$k)) {
-                        $this->$k = json_decode($d->$dk);
+                        $this->$k = json_decode($d->$dk, true);
                     } else {
                         $this->$k = $d->$dk;
                     }

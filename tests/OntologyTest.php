@@ -49,12 +49,21 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testInit(): void {
-        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
         $this->assertNotNull($o);
     }
 
+    public function testClassLabelComment(): void {
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
+        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $this->assertArrayHasKey('en', $c->label);
+        $this->assertArrayHasKey('de', $c->label);
+        $this->assertArrayHasKey('en', $c->comment);
+        $this->assertEquals('Collection', $c->label['en']);
+    }
+
     public function testClassInheritance(): void {
-        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
 
         $r1 = (new Graph())->resource('.');
         $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
@@ -73,7 +82,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testCardinalitiesIndirect(): void {
-        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
 
         $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
         $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact';
@@ -87,7 +96,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testCardinalitiesDirect(): void {
-        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
 
         $r1 = (new Graph())->resource('.');
         $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
@@ -103,11 +112,21 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testPropertyDomainRange(): void {
-        $o = new Ontology(self::$pdo, 'http://127.0.0.1/rest/%');
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
         $r = (new Graph())->resource('.');
         $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasUpdatedDate');
         $this->assertEquals('http://www.w3.org/2001/XMLSchema#date', $p->range);
         $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/schema#Main', $p->domain);
     }
 
+    public function testPropertyLabelComment(): void {
+        $o = new Ontology(self::$pdo, 'http://127.0.0.1/%');
+        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasContact'];        
+        $this->assertArrayHasKey('en', $p->label);
+        $this->assertArrayHasKey('de', $p->label);
+        $this->assertArrayHasKey('en', $p->comment);
+        $this->assertEquals('Contact(s)', $p->label['en']);
+    }
+    
 }

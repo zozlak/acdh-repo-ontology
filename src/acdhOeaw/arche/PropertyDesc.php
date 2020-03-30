@@ -34,43 +34,64 @@ namespace acdhOeaw\arche;
 class PropertyDesc extends BaseDesc {
 
     /**
-     *
+     * Property URI
+     * 
      * @var string
      */
     public $property;
 
     /**
-     *
+     * Property type URI (owl:DatatypeProperty or owl:ObjectProperty)
+     * 
      * @var string
      */
     public $type;
-    
+
     /**
-     *
+     * Associative array of skos:altLabel values (langauge as a key)
+     * 
+     * @var string[]
+     */
+    public $label = [];
+
+    /**
+     * Associative array of rdfs:comments values (langauge as a key)
+     * 
+     * @var string[]
+     */
+    public $comment = [];
+
+    /**
+     * Property domain URI
+     * 
      * @var string
      */
     public $domain;
-    
+
     /**
-     *
+     * Property URIs of all properties this one inhertis from (includint itself)
+     * 
      * @var string[]
      */
     public $properties = [];
-    
+
     /**
-     *
+     * Property range URI
+     * 
      * @var string
      */
     public $range;
 
     /**
-     *
+     * Minimum count
+     * 
      * @var int
      */
     public $min;
 
     /**
-     *
+     * Maximum count
+     * 
      * @var int
      */
     public $max;

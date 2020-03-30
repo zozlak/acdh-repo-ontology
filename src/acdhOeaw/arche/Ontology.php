@@ -143,16 +143,44 @@ class Ontology {
                     relations r 
                     JOIN t ON t.sid = r.id AND property = ?
             )
-            SELECT t.id, i1.ids AS class, json_agg(i2.ids ORDER BY n DESC) AS classes 
-            FROM 
-                t 
-                JOIN identifiers i1 ON t.id = i1.id AND i1.ids NOT LIKE ?
-                JOIN identifiers i2 ON t.sid = i2.id AND i2.ids NOT LIKE ?
-            GROUP BY 1, 2
+            SELECT c1.id, class, classes, label, comment
+            FROM
+                (
+                    SELECT t.id, i1.ids AS class, json_agg(i2.ids ORDER BY n DESC) AS classes 
+                    FROM 
+                        t 
+                        JOIN identifiers i1 ON t.id = i1.id AND i1.ids NOT LIKE ?
+                        JOIN identifiers i2 ON t.sid = i2.id AND i2.ids NOT LIKE ?
+                    GROUP BY 1, 2
+                ) c1
+                LEFT JOIN (
+                    SELECT id, json_object(array_agg(m2.lang), array_agg(m2.value)) AS label
+                    FROM 
+                        metadata m1
+                        JOIN metadata m2 USING (id)
+                    WHERE
+                        m1.property = ?
+                        AND substring(m1.value, 1, 1000) = ?
+                        AND m2.property = ?
+                    GROUP BY 1
+                ) c2 USING (id)
+                LEFT JOIN (
+                    SELECT id, json_object(array_agg(m2.lang), array_agg(m2.value)) AS comment
+                    FROM 
+                        metadata m1
+                        JOIN metadata m2 USING (id)
+                    WHERE
+                        m1.property = ?
+                        AND substring(m1.value, 1, 1000) = ?
+                        AND m2.property = ?
+                    GROUP BY 1
+                ) c3 USING (id)
         ";
         $param = [
             $nmspSkip, RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::RDFS_SUB_CLASS_OF, // with
-            $nmspSkip, $nmspSkip // normal query
+            $nmspSkip, $nmspSkip, // normal query - classes
+            RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::SKOS_ALT_LABEL, // normal query - label
+            RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::RDFS_COMMENT, // normal query - comment
         ];
         $query = $pdo->prepare($query);
         $query->execute($param);
@@ -182,31 +210,57 @@ class Ontology {
                 WHERE 
                     ids LIKE ?
                     AND property = ?
-                    AND value IN (?, ?)
+                    AND substring(value, 1, 1000) IN (?, ?)
               UNION
                 SELECT r.target_id, t.id, t.type, t.n + 1
                 FROM
                     relations r 
                     JOIN t ON t.sid = r.id AND property = ?
             )
-            SELECT 
-                t.id, 
-                i1.ids AS property, 
-                t.type, 
-                coalesce(m3.value, i3.ids) AS range, 
-                coalesce(m4.value, i4.ids) AS domain, 
-                json_agg(i2.ids ORDER BY n DESC) AS properties 
-            FROM 
-                t 
-                JOIN identifiers i1 ON t.id = i1.id AND i1.ids NOT LIKE ?
-                JOIN identifiers i2 ON t.sid = i2.id AND i2.ids NOT LIKE ?
-                LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
-                LEFT JOIN relations r3 ON t.id = r3.id AND r3.property = ?
-                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids NOT LIKE ?
-                LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
-                LEFT JOIN relations r4 ON t.id = r4.id AND r4.property = ?
-                LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids NOT LIKE ?
-            GROUP BY 1, 2, 3, 4, 5
+            SELECT id, property, type, range, domain, properties, label, comment
+            FROM
+                (
+                    SELECT 
+                        t.id, 
+                        i1.ids AS property, 
+                        t.type, 
+                        coalesce(m3.value, i3.ids) AS range, 
+                        coalesce(m4.value, i4.ids) AS domain, 
+                        json_agg(i2.ids ORDER BY n DESC) AS properties 
+                    FROM 
+                        t 
+                        JOIN identifiers i1 ON t.id = i1.id AND i1.ids NOT LIKE ?
+                        JOIN identifiers i2 ON t.sid = i2.id AND i2.ids NOT LIKE ?
+                        LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
+                        LEFT JOIN relations r3 ON t.id = r3.id AND r3.property = ?
+                        LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids NOT LIKE ?
+                        LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
+                        LEFT JOIN relations r4 ON t.id = r4.id AND r4.property = ?
+                        LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids NOT LIKE ?
+                    GROUP BY 1, 2, 3, 4, 5
+                ) t1
+                LEFT JOIN (
+                    SELECT id, json_object(array_agg(l2.lang), array_agg(l2.value)) AS label
+                    FROM 
+                        metadata l1
+                        JOIN metadata l2 USING (id)
+                    WHERE
+                        l1.property = ?
+                        AND substring(l1.value, 1, 1000) IN (?, ?)
+                        AND l2.property = ?
+                    GROUP BY 1
+                ) t2 USING (id)
+                LEFT JOIN (
+                    SELECT id, json_object(array_agg(c2.lang), array_agg(c2.value)) AS comment
+                    FROM 
+                        metadata c1
+                        JOIN metadata c2 USING (id)
+                    WHERE
+                        c1.property = ?
+                        AND substring(c1.value, 1, 1000) IN (?, ?)
+                        AND c2.property = ?
+                    GROUP BY 1
+                ) t3 USING (id)
         ";
         $param = [
             $nmspSkip, RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
@@ -214,6 +268,10 @@ class Ontology {
             $nmspSkip, $nmspSkip, // i1, i2
             RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspSkip, // m3, r3, i3
             RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspSkip, // m4, r4, i4
+            RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
+            RDF::SKOS_ALT_LABEL, // l1, l2
+            RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
+            RDF::RDFS_COMMENT, // c1, c2
         ];
         $query = $pdo->prepare($query);
         $query->execute($param);
