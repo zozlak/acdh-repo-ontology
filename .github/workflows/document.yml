@@ -21,8 +21,9 @@ jobs:
     - name: commit docs
       run: |
         cd docsrepo
+        git status
         git config user.email "workflow@github.actions"
         git config user.name "Github Actions Workflow"
-        git add docsrepo/arche-lib-schema/*
+        git add arche-lib-schema/*
         git commit -a -m 'Documentation updated'
         git push origin
