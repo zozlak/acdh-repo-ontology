@@ -39,8 +39,6 @@ use zozlak\RdfConstants as RDF;
  */
 class Ontology {
 
-    const FEDORA_LAST_MOD = '<http://fedora.info/definitions/v4/repository#lastModified>';
-
     /**
      *
      * @var ClassDesc[]

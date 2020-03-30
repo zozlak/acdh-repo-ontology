@@ -1,5 +1,6 @@
 /nbproject
 /.phpunit.result.cache
+/.phpdoc
 /vendor
 /composer.lock
 /build/logs
