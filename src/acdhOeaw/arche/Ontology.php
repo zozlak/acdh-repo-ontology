@@ -67,10 +67,10 @@ class Ontology {
      * 
      * @param Fedora $fedora repository connection object
      */
-    public function __construct(PDO $pdo, string $nmspSkip) {
-        $this->loadClasses($pdo, $nmspSkip);
-        $this->loadProperties($pdo, $nmspSkip);
-        $this->loadRestrictions($pdo, $nmspSkip);
+    public function __construct(PDO $pdo, object $schema) {
+        $this->loadClasses($pdo, $schema->skipNamespace);
+        $this->loadProperties($pdo, $schema);
+        $this->loadRestrictions($pdo, $schema->skipNamespace);
         $this->preprocess();
     }
 
@@ -213,9 +213,10 @@ class Ontology {
         }
     }
 
-    private function loadProperties(PDO $pdo, string $nmspSkip): void {
+    private function loadProperties(PDO $pdo, object $schema): void {
+        $nmspSkip = $schema->skipNamespace;
         // slightly more complex to deal with rdfs:range and rdfs:domain no matter if they are stored as relations or literals-like
-        $query = "
+        $query    = "
             WITH RECURSIVE t(sid, id, type, n) AS (
                 SELECT DISTINCT id, id, value, 0
                 FROM 
@@ -231,7 +232,7 @@ class Ontology {
                     relations r 
                     JOIN t ON t.sid = r.id AND property = ?
             )
-            SELECT id, property, type, range, domain, properties, label, comment
+            SELECT id, property, type, range, domain, \"order\", properties, label, comment, recommended
             FROM
                 (
                     SELECT 
@@ -240,6 +241,7 @@ class Ontology {
                         t.type, 
                         coalesce(m3.value, i3.ids) AS range, 
                         coalesce(m4.value, i4.ids) AS domain, 
+                        m5.value_n AS \"order\",
                         json_agg(i2.ids ORDER BY n DESC) AS properties 
                     FROM 
                         t 
@@ -251,7 +253,8 @@ class Ontology {
                         LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
                         LEFT JOIN relations r4 ON t.id = r4.id AND r4.property = ?
                         LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids NOT LIKE ?
-                    GROUP BY 1, 2, 3, 4, 5
+                        LEFT JOIN metadata m5 ON t.id = m5.id AND m5.property = ?
+                    GROUP BY 1, 2, 3, 4, 5, 6
                 ) t1
                 LEFT JOIN (
                     SELECT id, json_object(array_agg(l2.lang), array_agg(l2.value)) AS label
@@ -275,21 +278,29 @@ class Ontology {
                         AND c2.property = ?
                     GROUP BY 1
                 ) t3 USING (id)
+                LEFT JOIN (
+                    SELECT id, json_agg(r1.value) AS recommended
+                    FROM metadata r1
+                    WHERE r1.property = ?
+                    GROUP BY 1
+                ) t4 USING (id)
         ";
-        $param = [
+        $param    = [
             $nmspSkip, RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
             RDF::RDFS_SUB_PROPERTY_OF, // with recursive term
             $nmspSkip, $nmspSkip, // i1, i2
             RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspSkip, // m3, r3, i3
             RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspSkip, // m4, r4, i4
+            $schema->order, // m5
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
             RDF::SKOS_ALT_LABEL, // l1, l2
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
             RDF::RDFS_COMMENT, // c1, c2
+            $schema->recommended, // r1
         ];
-        $query = $pdo->prepare($query);
+        $query    = $pdo->prepare($query);
         $query->execute($param);
-        while ($p     = $query->fetch(PDO::FETCH_OBJ)) {
+        while ($p        = $query->fetch(PDO::FETCH_OBJ)) {
             $this->properties[$p->property] = new PropertyDesc($p);
         }
     }
@@ -361,7 +372,9 @@ class Ontology {
         // assign properties to classes
         foreach ($this->properties as $p) {
             foreach ($this->classesRev[$p->domain] ?? [] as $c) {
-                $c->properties[$p->property] = clone($p); // clone because restrictions apply to a {property, class}
+                $pp              = clone($p); // clone because restrictions apply to a {property, class}
+                $pp->recommended = count(array_intersect($c->classes, $p->recommended)) > 0;
+                $c->properties[$p->property] = $pp;
             }
         }
 

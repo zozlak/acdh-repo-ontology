@@ -10,9 +10,13 @@ An API for the ACDH ontology stored in an ARCHE repository.
 
 ```php
 $conn = new PDO('pgsql: repo db connection details');
-$baseUrlLike = 'https://repository.base/url/%'; // don't forget the '%' at the end!
+$cfg = (object) [
+    'skipNamespace' => 'https://repository.base/url/%', // don't forget the '%' at the end!
+    'order'         => 'https://vocabs.acdh.oeaw.ac.at/schema#ordering',
+    'recommended'   => 'https://vocabs.acdh.oeaw.ac.at/schema#recommendedClass',
+];
 
-$ontology = new \acdhOeaw\arche\Ontology($conn, $baseUrlLike);
+$ontology = new \acdhOeaw\arche\Ontology($conn, $cfg);
 
 $class = $ontology->getClass('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject');
 print_r($class);

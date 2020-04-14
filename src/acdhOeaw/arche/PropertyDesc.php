@@ -96,4 +96,16 @@ class PropertyDesc extends BaseDesc {
      */
     public $max;
 
+    /**
+     * If a class is among acdh:recommendedClass for this property.
+     * @var bool
+     */
+    public $recommended = [];
+
+    /**
+     * achd:ordering annotation property value
+     * @var int
+     */
+    public $order;
+
 }
