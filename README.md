@@ -14,6 +14,8 @@ $cfg = (object) [
     'skipNamespace' => 'https://repository.base/url/%', // don't forget the '%' at the end!
     'order'         => 'https://vocabs.acdh.oeaw.ac.at/schema#ordering',
     'recommended'   => 'https://vocabs.acdh.oeaw.ac.at/schema#recommendedClass',
+    'langTag'       => 'https://vocabs.acdh.oeaw.ac.at/schema#langTag',
+    'vocabs'        => 'https://vocabs.acdh.oeaw.ac.at/schema#vocabs',
 ];
 
 $ontology = new \acdhOeaw\arche\Ontology($conn, $cfg);

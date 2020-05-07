@@ -38,6 +38,9 @@ class BaseDesc {
      * @param object $d
      */
     public function __construct(object $d = null) {
+if ($this instanceof PropertyDesc && $d->property === 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle') {
+    print_r($d);
+}
         if ($d !== null) {
             foreach ($this as $k => $v) {
                 $dk = strtolower($k);

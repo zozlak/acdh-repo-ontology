@@ -57,6 +57,8 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
                 'skipNamespace' => 'http://127.0.0.1/%',
                 'order'         => 'https://vocabs.acdh.oeaw.ac.at/schema#ordering',
                 'recommended'   => 'https://vocabs.acdh.oeaw.ac.at/schema#recommendedClass',
+                'langTag'       => 'https://vocabs.acdh.oeaw.ac.at/schema#langTag',
+                'vocabs'        => 'https://vocabs.acdh.oeaw.ac.at/schema#vocabs',
         ];
     }
 
@@ -141,6 +143,20 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals('Contact(s)', $p->label['en']);
     }
 
+    public function testPropertyLangTag(): void {
+        $o = new Ontology(self::$pdo, self::$schema);
+        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
+        $this->assertEquals(1, $p->langTag);
+    }
+
+    public function testPropertyVocabs(): void {
+        $o = new Ontology(self::$pdo, self::$schema);
+        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+        $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/arche_licenses/', $p->vocabs);
+    }
+    
     public function testPropertyByClassUri(): void {
         $o = new Ontology(self::$pdo, self::$schema);
         $p = $o->getProperty('https://vocabs.acdh.oeaw.ac.at/schema#Collection', 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');

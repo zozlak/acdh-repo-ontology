@@ -55,7 +55,7 @@ class PropertyDesc extends BaseDesc {
     public $label = [];
 
     /**
-     * Associative array of rdfs:comments values (langauge as a key)
+     * Associative array of rdfs:comments values (language as a key)
      * 
      * @var string[]
      */
@@ -108,4 +108,15 @@ class PropertyDesc extends BaseDesc {
      */
     public $order;
 
+    /**
+     * acdh:langTag annotation property value
+     * @var bool
+     */
+    public $langTag;
+    
+    /**
+     * acdh:vocabs annotation property value
+     * @var string
+     */
+    public $vocabs;
 }

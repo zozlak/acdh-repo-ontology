@@ -232,7 +232,7 @@ class Ontology {
                     relations r 
                     JOIN t ON t.sid = r.id AND property = ?
             )
-            SELECT id, property, type, range, domain, \"order\", properties, label, comment, recommended
+            SELECT id, property, type, range, domain, \"order\", properties, label, comment, recommended, langtag, vocabs
             FROM
                 (
                     SELECT 
@@ -242,6 +242,8 @@ class Ontology {
                         coalesce(m3.value, i3.ids) AS range, 
                         coalesce(m4.value, i4.ids) AS domain, 
                         m5.value_n AS \"order\",
+                        m6.value AS langtag,
+                        m7.value AS vocabs,
                         json_agg(i2.ids ORDER BY n DESC) AS properties 
                     FROM 
                         t 
@@ -254,7 +256,9 @@ class Ontology {
                         LEFT JOIN relations r4 ON t.id = r4.id AND r4.property = ?
                         LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids NOT LIKE ?
                         LEFT JOIN metadata m5 ON t.id = m5.id AND m5.property = ?
-                    GROUP BY 1, 2, 3, 4, 5, 6
+                        LEFT JOIN metadata m6 ON t.id = m6.id AND m6.property = ?
+                        LEFT JOIN metadata m7 ON t.id = m7.id AND m7.property = ?
+                    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
                 ) t1
                 LEFT JOIN (
                     SELECT id, json_object(array_agg(l2.lang), array_agg(l2.value)) AS label
@@ -291,7 +295,7 @@ class Ontology {
             $nmspSkip, $nmspSkip, // i1, i2
             RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspSkip, // m3, r3, i3
             RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspSkip, // m4, r4, i4
-            $schema->order, // m5
+            $schema->order, $schema->langTag, $schema->vocabs, // m5, m6, m7
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
             RDF::SKOS_ALT_LABEL, // l1, l2
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
