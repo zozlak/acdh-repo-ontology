@@ -29,4 +29,9 @@ print_r($property);
 $property = $ontology->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
 print_r($property);
 
+$ontology->fetchVocabularies('vocabsCache.json', 'PT10D');
+$property = $ontology->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense');
+print_r($property->vocabsValues);
+echo $property->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en');
+
 ```

@@ -26,8 +26,13 @@
 
 namespace acdhOeaw\arche;
 
+use DateInterval;
+use DateTime;
 use PDO;
+use EasyRdf\Graph;
 use EasyRdf\Resource;
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -72,6 +77,75 @@ class Ontology {
         $this->loadProperties($pdo, $schema);
         $this->loadRestrictions($pdo, $schema->skipNamespace);
         $this->preprocess();
+    }
+
+    /**
+     * Fetches vocabulary definitions provided in the ontology.
+     * 
+     * Fetching is done in a best-affort way - no error is thrown if a given 
+     * vocabulary can't be fetched.
+     * 
+     * May use a cache.
+     * 
+     * Be aware fetching and parsing all vocabularies may be time consuming.
+     * 
+     * @param string $cacheFile cache file to use. If it doesn't exist, it will
+     *   be created.
+     * @param string $validTime cache validity time in the ISO8601 duration format.
+     *   (see https://en.wikipedia.org/wiki/ISO_8601#Durations, e.g. `PT3H` means
+     *   3 hours). Be aware default value is 0 seconds meaning effectively no caching.
+     * @return void
+     */
+    public function fetchVocabularies(string $cacheFile = null,
+                                      string $validTime = 'PT0S'): void {
+        $options = [
+            'verify'          => false,
+            'http_errors'     => false,
+            'allow_redirects' => true,
+            'headers'         => ['Accept' => ['text/turtle, application/rdf+xml, application/n-triples']],
+        ];
+        $client  = new Client($options);
+
+        $cache = (object) [];
+        if (!empty($cacheFile) && file_exists($cacheFile)) {
+            $timeMod = new DateTime();
+            $timeMod->setTimestamp(stat($cacheFile)['mtime']);
+            if (new DateTime() <= $timeMod->add(new DateInterval($validTime))) {
+                $cache = json_decode(file_get_contents($cacheFile));
+                foreach ($cache as $vocabulary) {
+                    foreach ($vocabulary as $id => $concept) {
+                        $vocabulary->$id = SkosConceptDesc::fromObject($concept);
+                    }
+                }
+            }
+        }
+
+        foreach ($this->classes as $class) {
+            foreach ($class->properties as $prop) {
+                if (empty($prop->vocabs)) {
+                    continue;
+                }
+                if (!isset($cache->{$prop->vocabs}) || $cache->{$prop->vocabs} === null) {
+                    $resp = $client->send(new Request('GET', $prop->vocabs));
+                    if ($resp->getStatusCode() !== 200) {
+                        continue;
+                    }
+                    $body  = (string) $resp->getBody();
+                    $graph = new Graph();
+                    $graph->parse($body, $resp->getHeader('Content-Type')[0] ?? null);
+
+                    $cache->{$prop->vocabs} = [];
+                    foreach ($graph->allOfType(RDF::SKOS_CONCEPT) as $concept) {
+                        $cache->{$prop->vocabs}[$concept->getUri()] = SkosConceptDesc::fromResource($concept);
+                    }
+                }
+                $prop->vocabsValues = ((array) $cache->{$prop->vocabs}) ?? null;
+            }
+        }
+
+        if (!empty($cacheFile)) {
+            file_put_contents($cacheFile, json_encode($cache));
+        }
     }
 
     /**
@@ -376,8 +450,8 @@ class Ontology {
         // assign properties to classes
         foreach ($this->properties as $p) {
             foreach ($this->classesRev[$p->domain] ?? [] as $c) {
-                $pp              = clone($p); // clone because restrictions apply to a {property, class}
-                $pp->recommended = count(array_intersect($c->classes, $p->recommended)) > 0;
+                $pp                          = clone($p); // clone because restrictions apply to a {property, class}
+                $pp->recommended             = count(array_intersect($c->classes, $p->recommended)) > 0;
                 $c->properties[$p->property] = $pp;
             }
         }

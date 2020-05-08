@@ -119,4 +119,11 @@ class PropertyDesc extends BaseDesc {
      * @var string
      */
     public $vocabs;
+    
+    /**
+     * Array of vocabulary values fetched from vocabulary pointed by acdh:vocabs
+     * annotation property
+     * @var SkocConceptDesc[]
+     */
+    public $vocabsValues;
 }
