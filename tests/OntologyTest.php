@@ -50,7 +50,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     static private $schema;
 
     static public function setUpBeforeClass(): void {
-        self::$pdo = new PDO('pgsql: host=127.0.0.1 port=5432 user=www-data');
+        self::$pdo = new PDO('pgsql: host=localhost port=5432 user=www-data');
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         self::$schema = (object) [
