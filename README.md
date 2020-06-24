@@ -1,4 +1,10 @@
-# arche-lib-ontology
+# arche-lib-schema
+
+[![Latest Stable Version](https://poser.pugx.org/acdh-oeaw/arche-lib-schema/v/stable)](https://packagist.org/packages/acdh-oeaw/arche-lib-schema)
+![Build status](https://github.com/acdh-oeaw/arche-lib-schema/workflows/phpunit/badge.svg?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/acdh-oeaw/arche-lib-schema/badge.svg?branch=master)](https://coveralls.io/github/acdh-oeaw/arche-lib-schema?branch=master)
+[![License](https://poser.pugx.org/acdh-oeaw/arche-lib-schema/license)](https://packagist.org/packages/acdh-oeaw/arche-lib-schema)
+
 
 An API for the ACDH ontology stored in an ARCHE repository.
 
