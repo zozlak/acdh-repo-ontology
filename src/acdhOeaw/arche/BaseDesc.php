@@ -34,6 +34,13 @@ namespace acdhOeaw\arche;
 class BaseDesc {
 
     /**
+     * Associative array of label values (langauge as a key)
+     * 
+     * @var string[]
+     */
+    public $label = [];
+
+    /**
      * 
      * @param object $d
      */
@@ -42,7 +49,7 @@ class BaseDesc {
             foreach ($this as $k => $v) {
                 $dk = strtolower($k);
                 if (isset($d->$dk)) {
-                    if (is_array($this->$k)) {
+                    if (is_array($this->$k) && !is_array($d->$dk)) {
                         $this->$k = json_decode($d->$dk, true);
                     } else {
                         $this->$k = $d->$dk;
@@ -50,6 +57,10 @@ class BaseDesc {
                 }
             }
         }
+    }
+
+    public function getLabel(string $lang, string $fallbackLang = 'en'): string {
+        return $this->label[$lang] ?? ($this->label[$fallbackLang] ?? (reset($this->label) ?? ''));
     }
 
 }

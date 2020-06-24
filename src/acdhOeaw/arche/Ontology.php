@@ -26,13 +26,8 @@
 
 namespace acdhOeaw\arche;
 
-use DateInterval;
-use DateTime;
 use PDO;
-use EasyRdf\Graph;
 use EasyRdf\Resource;
-use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -43,6 +38,9 @@ use zozlak\RdfConstants as RDF;
  * @author zozlak
  */
 class Ontology {
+
+    private $pdo;
+    private $schema;
 
     /**
      *
@@ -70,82 +68,17 @@ class Ontology {
 
     /**
      * 
-     * @param Fedora $fedora repository connection object
+     * @param PDO $pdo
+     * @param object $schema
      */
     public function __construct(PDO $pdo, object $schema) {
-        $this->loadClasses($pdo, $schema->skipNamespace);
-        $this->loadProperties($pdo, $schema);
-        $this->loadRestrictions($pdo, $schema->skipNamespace);
+        $this->pdo    = $pdo;
+        $this->schema = $schema;
+
+        $this->loadClasses();
+        $this->loadProperties();
+        $this->loadRestrictions();
         $this->preprocess();
-    }
-
-    /**
-     * Fetches vocabulary definitions provided in the ontology.
-     * 
-     * Fetching is done in a best-affort way - no error is thrown if a given 
-     * vocabulary can't be fetched.
-     * 
-     * May use a cache.
-     * 
-     * Be aware fetching and parsing all vocabularies may be time consuming.
-     * 
-     * @param string $cacheFile cache file to use. If it doesn't exist, it will
-     *   be created.
-     * @param string $validTime cache validity time in the ISO8601 duration format.
-     *   (see https://en.wikipedia.org/wiki/ISO_8601#Durations, e.g. `PT3H` means
-     *   3 hours). Be aware default value is 0 seconds meaning effectively no caching.
-     * @return void
-     */
-    public function fetchVocabularies(string $cacheFile = null,
-                                      string $validTime = 'PT0S'): void {
-        $options = [
-            'verify'          => false,
-            'http_errors'     => false,
-            'allow_redirects' => true,
-            'headers'         => ['Accept' => ['text/turtle, application/rdf+xml, application/n-triples']],
-        ];
-        $client  = new Client($options);
-
-        $cache = (object) [];
-        if (!empty($cacheFile) && file_exists($cacheFile)) {
-            $timeMod = new DateTime();
-            $timeMod->setTimestamp(stat($cacheFile)['mtime']);
-            if (new DateTime() <= $timeMod->add(new DateInterval($validTime))) {
-                $cache = json_decode(file_get_contents($cacheFile));
-                foreach ($cache as $vocabulary) {
-                    foreach ($vocabulary as $id => $concept) {
-                        $vocabulary->$id = SkosConceptDesc::fromObject($concept);
-                    }
-                }
-            }
-        }
-
-        foreach ($this->classes as $class) {
-            foreach ($class->properties as $prop) {
-                if (empty($prop->vocabs)) {
-                    continue;
-                }
-                if (!isset($cache->{$prop->vocabs}) || $cache->{$prop->vocabs} === null) {
-                    $resp = $client->send(new Request('GET', $prop->vocabs));
-                    if ($resp->getStatusCode() !== 200) {
-                        continue;
-                    }
-                    $body  = (string) $resp->getBody();
-                    $graph = new Graph();
-                    $graph->parse($body, $resp->getHeader('Content-Type')[0] ?? null);
-
-                    $cache->{$prop->vocabs} = [];
-                    foreach ($graph->allOfType(RDF::SKOS_CONCEPT) as $concept) {
-                        $cache->{$prop->vocabs}[$concept->getUri()] = SkosConceptDesc::fromResource($concept);
-                    }
-                }
-                $prop->vocabsValues = ((array) $cache->{$prop->vocabs}) ?? null;
-            }
-        }
-
-        if (!empty($cacheFile)) {
-            file_put_contents($cacheFile, json_encode($cache));
-        }
     }
 
     /**
@@ -214,8 +147,93 @@ class Ontology {
         return $this->properties[$property] ?? null;
     }
 
-    private function loadClasses(PDO $pdo, string $nmspSkip): void {
+    /**
+     * Fetches an array of SkosConceptDesc objects desribing allowed vocabulary
+     * values.
+     * 
+     * @param string $vocabularyUrl
+     * @return SkosConceptDesc[]
+     */
+    public function getVocabularyValues(string $vocabularyUrl): array {
         $query = "
+            WITH c AS (
+                SELECT r.id
+                FROM
+                    identifiers i
+                    JOIN relations r ON r.target_id = i.id AND r.property = ?
+                WHERE ids = ?
+            )
+            SELECT json_agg(row_to_json(t))
+            FROM (
+                SELECT *
+                FROM
+                    c
+                    JOIN (
+                        SELECT id, json_agg(ids) AS uri
+                        FROM identifiers WHERE ids NOT LIKE ?
+                        GROUP BY 1
+                    ) t0 USING (id)
+                    JOIN (
+                        SELECT id, json_agg(json_build_object('lang', lang, 'value', value)) AS label
+                        FROM metadata
+                        WHERE property = ?
+                        GROUP BY 1
+                    ) t1 USING (id)
+                    LEFT JOIN (
+                        SELECT id, json_agg(target_id) AS narrower
+                        FROM relations
+                        WHERE property = ?
+                        GROUP BY 1
+                    ) t2 USING (id)
+                    LEFT JOIN (
+                        SELECT id, json_agg(target_id) AS broader
+                        FROM relations
+                        WHERE property = ?
+                        GROUP BY 1
+                    ) t3 USING (id)
+            ) t
+        ";
+        $param = [
+            $this->schema->parent, $vocabularyUrl, // WITH
+            $this->schema->skipNamespace, // t0
+            $this->schema->label, // t1
+            RDF::SKOS_NARROWER, // t2
+            RDF::SKOS_BROADER, // t3
+        ];
+        $query = $this->pdo->prepare($query);
+        $query->execute($param);
+        $tmp   = json_decode($query->fetchColumn());
+
+        $concepts = [];
+        foreach ($tmp as $i) {
+            $i->uri = $i->uri[0];
+            $langs  = array_map(function($x) {
+                return $x->lang;
+            }, $i->label);
+            $labels = array_map(function($x) {
+                return $x->value;
+            }, $i->label);
+            $i->label                        = array_combine($langs, $labels);
+            $concept                         = new SkosConceptDesc($i);
+            $concepts[(string) $concept->id] = $concept;
+        }
+        foreach ($concepts as $i) {
+            $i->broader = array_map(function($x) use ($concepts) {
+                return $concepts[(string) $x];
+            }, $i->broader);
+            $i->narrower = array_map(function($x) use ($concepts) {
+                return $concepts[(string) $x];
+            }, $i->narrower);
+        }
+        $uris = array_map(function($x) {
+            return $x->uri;
+        }, $concepts);
+        return array_combine($uris, array_values($concepts));
+    }
+
+    private function loadClasses(): void {
+        $nmspSkip = $this->schema->skipNamespace;
+        $query    = "
             WITH RECURSIVE t(sid, id, n) AS (
                 SELECT DISTINCT id, id, 0
                 FROM
@@ -264,15 +282,15 @@ class Ontology {
                     GROUP BY 1
                 ) c3 USING (id)
         ";
-        $param = [
+        $param    = [
             $nmspSkip, RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::RDFS_SUB_CLASS_OF, // with
             $nmspSkip, $nmspSkip, // normal query - classes
             RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::SKOS_ALT_LABEL, // normal query - label
             RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::RDFS_COMMENT, // normal query - comment
         ];
-        $query = $pdo->prepare($query);
+        $query    = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($c     = $query->fetch(PDO::FETCH_OBJ)) {
+        while ($c        = $query->fetch(PDO::FETCH_OBJ)) {
             $this->classes[$c->class] = new ClassDesc($c);
         }
 
@@ -287,8 +305,8 @@ class Ontology {
         }
     }
 
-    private function loadProperties(PDO $pdo, object $schema): void {
-        $nmspSkip = $schema->skipNamespace;
+    private function loadProperties(): void {
+        $nmspSkip = $this->schema->skipNamespace;
         // slightly more complex to deal with rdfs:range and rdfs:domain no matter if they are stored as relations or literals-like
         $query    = "
             WITH RECURSIVE t(sid, id, type, n) AS (
@@ -369,23 +387,28 @@ class Ontology {
             $nmspSkip, $nmspSkip, // i1, i2
             RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspSkip, // m3, r3, i3
             RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspSkip, // m4, r4, i4
-            $schema->order, $schema->langTag, $schema->vocabs, // m5, m6, m7
+            $this->schema->order, $this->schema->langTag, $this->schema->vocabs, // m5, m6, m7
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
             RDF::SKOS_ALT_LABEL, // l1, l2
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
             RDF::RDFS_COMMENT, // c1, c2
-            $schema->recommended, // r1
+            $this->schema->recommended, // r1
         ];
-        $query    = $pdo->prepare($query);
+        $query    = $this->pdo->prepare($query);
         $query->execute($param);
         while ($p        = $query->fetch(PDO::FETCH_OBJ)) {
-            $this->properties[$p->property] = new PropertyDesc($p);
+            $prop                           = new PropertyDesc($p);
+            if (!empty($prop->vocabs)) {
+                $prop->setOntology($this);
+            }
+            $this->properties[$p->property] = $prop;
         }
     }
 
-    private function loadRestrictions(PDO $pdo, string $nmspSkip): void {
+    private function loadRestrictions(): void {
+        $nmspSkip = $this->schema->skipNamespace;
         // slightly more complex to deal with owl:onDataRange and owl:onClass no matter if they are stored as relations or literals-like
-        $query = "
+        $query    = "
             SELECT 
                 t.id, 
                 t.ids AS class,
@@ -420,7 +443,7 @@ class Ontology {
                 LEFT JOIN metadata m8 ON t.id = m8.id AND m8.property = ?            
                 LEFT JOIN metadata m9 ON t.id = m9.id AND m9.property = ?
         ";
-        $param = [
+        $param    = [
             $nmspSkip, RDF::RDF_TYPE, RDF::OWL_RESTRICTION,
             RDF::OWL_ON_PROPERTY, RDF::OWL_ON_PROPERTY, $nmspSkip, // m1, r1, i1
             RDF::OWL_ON_CLASS, RDF::OWL_ON_CLASS, $nmspSkip, // m2, r2, i2
@@ -428,9 +451,9 @@ class Ontology {
             RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY, RDF::OWL_MAX_CARDINALITY, // m4, m5, m6
             RDF::OWL_QUALIFIED_CARDINALITY, RDF::OWL_MIN_QUALIFIED_CARDINALITY, RDF::OWL_MAX_QUALIFIED_CARDINALITY, // m7, m8, m9
         ];
-        $query = $pdo->prepare($query);
+        $query    = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($r     = $query->fetch(PDO::FETCH_OBJ)) {
+        while ($r        = $query->fetch(PDO::FETCH_OBJ)) {
             $this->restrictions[$r->class] = new RestrictionDesc($r);
         }
     }

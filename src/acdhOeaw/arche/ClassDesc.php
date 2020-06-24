@@ -41,13 +41,6 @@ class ClassDesc extends BaseDesc {
     public $class;
 
     /**
-     * Associative array of skos:altLabel values (langauge as a key)
-     * 
-     * @var string[]
-     */
-    public $label = [];
-
-    /**
      * Associative array of rdfs:comments values (langauge as a key)
      * 
      * @var string[]

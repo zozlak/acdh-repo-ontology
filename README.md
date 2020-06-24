@@ -16,11 +16,13 @@ $cfg = (object) [
     'recommended'   => 'https://vocabs.acdh.oeaw.ac.at/schema#recommendedClass',
     'langTag'       => 'https://vocabs.acdh.oeaw.ac.at/schema#langTag',
     'vocabs'        => 'https://vocabs.acdh.oeaw.ac.at/schema#vocabs',
+    'parent'        => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
+    'label'         => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
 ];
 
 $ontology = new \acdhOeaw\arche\Ontology($conn, $cfg);
 
-$class = $ontology->getClass('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject');
+$class = $ontology->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Person');
 print_r($class);
 
 $property = $ontology->getProperty('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject', 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
@@ -29,9 +31,8 @@ print_r($property);
 $property = $ontology->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
 print_r($property);
 
-$ontology->fetchVocabularies('vocabsCache.json', 'P10D');
 $property = $ontology->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense');
 print_r($property->vocabsValues);
-echo $property->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en');
+echo $property->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('de');
 
 ```

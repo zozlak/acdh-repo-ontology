@@ -26,69 +26,16 @@
 
 namespace acdhOeaw\arche;
 
-use EasyRdf\Resource;
-use zozlak\RdfConstants as RDF;
-
 /**
  * Container class for a skos:Concept
  *
  * @author zozlak
  */
-class SkosConceptDesc {
+class SkosConceptDesc extends BaseDesc {
 
-    static public function fromResource(Resource $data): self {
-        $o      = new self();
-        $o->uri = $data->getUri();
-
-        $skosNmsp = substr(RDF::SKOS_ALT_LABEL, 0, strpos(RDF::SKOS_ALT_LABEL, '#') + 1);
-        foreach ($o as $k => $v) {
-            $values = $data->all($skosNmsp . $k);
-            if (count($values) === 0) {
-                continue;
-            }
-            if (!is_array($v)) {
-                $o->$k = (string) $values[0];
-            } else {
-                foreach ($values as $v) {
-                    if ($v instanceof Resource || empty($v->getLang())) {
-                        $o->$k[] = (string) $v;
-                    } else {
-                        $o->$k[$v->getLang()] = (string) $v;
-                    }
-                }
-            }
-        }
-        return $o;
-    }
-
-    static public function fromObject(object $data): self {
-        $o = new self();
-        foreach ($o as $k => $v) {
-            if (isset($data->$k)) {
-                if (is_object($data->$k)) {
-                    $o->$k = (array) $data->$k;
-                } else {
-                    $o->$k = $data->$k;
-                }
-            }
-        }
-        return $o;
-    }
-
+    public $id;
     public $uri;
-    public $broader   = [];
-    public $narrower  = [];
-    public $altLabel  = [];
-    public $prefLabel = [];
-
-    public function getLabel(string $lang, string $fallbackLang = 'en'): string {
-        return $this->prefLabel[$lang] ??
-            ($this->altLabel[$lang] ??
-            ($this->prefLabel[$fallbackLang] ??
-            ($this->altLabel[$fallbackLang] ??
-            (reset($this->prefLabel) ??
-            (reset($this->altLabel) ??
-            '')))));
-    }
+    public $broader  = [];
+    public $narrower = [];
 
 }

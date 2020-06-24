@@ -59,6 +59,8 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
                 'recommended'   => 'https://vocabs.acdh.oeaw.ac.at/schema#recommendedClass',
                 'langTag'       => 'https://vocabs.acdh.oeaw.ac.at/schema#langTag',
                 'vocabs'        => 'https://vocabs.acdh.oeaw.ac.at/schema#vocabs',
+                'parent'        => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
+                'label'         => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
         ];
     }
 
@@ -159,28 +161,14 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
 
     public function testPropertyVocabsValues(): void {
         $o = new Ontology(self::$pdo, self::$schema);
-        
-        $o->fetchVocabularies('cache.json');
         $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
         $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
         $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0', $p->vocabsValues);
         $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'));
         $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'));
         $this->assertEquals('Namensnennung 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'de'));
-
-        $t = microtime(true);
-        $o->fetchVocabularies('cache.json', 'PT1H');
-        $this->assertLessThan(0.5, microtime(true) - $t);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0', $p->vocabsValues);
-        $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'));
-        $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'));
-        $this->assertEquals('Namensnennung 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'de'));
-        
-        unlink('cache.json');
     }
-    
+
     public function testPropertyByClassUri(): void {
         $o = new Ontology(self::$pdo, self::$schema);
         $p = $o->getProperty('https://vocabs.acdh.oeaw.ac.at/schema#Collection', 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');

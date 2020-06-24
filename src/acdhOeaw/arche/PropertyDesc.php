@@ -48,13 +48,6 @@ class PropertyDesc extends BaseDesc {
     public $type;
 
     /**
-     * Associative array of skos:altLabel values (langauge as a key)
-     * 
-     * @var string[]
-     */
-    public $label = [];
-
-    /**
      * Associative array of rdfs:comments values (language as a key)
      * 
      * @var string[]
@@ -113,17 +106,35 @@ class PropertyDesc extends BaseDesc {
      * @var bool
      */
     public $langTag;
-    
+
     /**
      * acdh:vocabs annotation property value
      * @var string
      */
     public $vocabs;
-    
+
     /**
      * Array of vocabulary values fetched from vocabulary pointed by acdh:vocabs
      * annotation property
      * @var SkocConceptDesc[]
      */
-    public $vocabsValues;
+    private $vocabsValues;
+
+    /**
+     *
+     * @var Ontology
+     */
+    private $ontologyObj;
+
+    public function setOntology(Ontology $ontology) {
+        $this->ontologyObj = $ontology;
+    }
+
+    public function __get(string $name) {
+        if ($name === 'vocabsValues' && $this->vocabsValues === null && !empty($this->vocabs)) {
+            $this->vocabsValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
+        }
+        return $this->$name;
+    }
+
 }

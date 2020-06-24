@@ -10,7 +10,9 @@ jobs:
     - name: clone repo config
       run: |
         git clone --depth 1 --branch arche https://github.com/acdh-oeaw/arche-docker-config.git config
-        rm -f config/run.d/gui.sh config/run.d/oaipmh.sh config/run.d/resolver.sh config/initScripts/20-basicResources.php config/initScripts/30-dissServices.php
+        rm -f config/run.d/gui.sh config/run.d/oaipmh.sh config/run.d/resolver.sh config/initScripts/30-dissServices.php
+        cp .github/workflows/test-postgresql_config.sh config/run.d/
+        cp .github/workflows/30-fixVocabularies.sh config/initScripts/
     - name: run repo docker
       run: |
         mkdir log

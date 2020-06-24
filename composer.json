@@ -18,9 +18,8 @@
     },
     "require": {
         "php": ">= 7.1",
-        "zozlak/rdf-constants": "^1.0.0",
-        "acdh-oeaw/easyrdf": "*",
-        "guzzlehttp/guzzle": "^6"
+        "zozlak/rdf-constants": "^1",
+        "acdh-oeaw/easyrdf": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "^8.4"
