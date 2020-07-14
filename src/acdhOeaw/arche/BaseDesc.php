@@ -41,6 +41,13 @@ class BaseDesc {
     public $label = [];
 
     /**
+     * Associative array of rdfs:comment values (langauge as a key)
+     * 
+     * @var string[]
+     */
+    public $comment = [];
+    
+    /**
      * 
      * @param object $d
      */
@@ -60,7 +67,14 @@ class BaseDesc {
     }
 
     public function getLabel(string $lang, string $fallbackLang = 'en'): string {
-        return $this->label[$lang] ?? ($this->label[$fallbackLang] ?? (reset($this->label) ?? ''));
+        return $this->getPropInLang('label', $lang, $fallbackLang);
     }
 
+    public function getComment(string $lang, string $fallbackLang = 'en'): string {
+        return $this->getPropInLang('comment', $lang, $fallbackLang);
+    }
+    
+    private function getPropInLang(string $property, string $lang, string $fallbackLang): string {
+        return $this->{$property}[$lang] ?? ($this->{$property}[$fallbackLang] ?? (reset($this->$property) ?? ''));
+    }
 }

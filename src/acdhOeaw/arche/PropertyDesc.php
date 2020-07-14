@@ -48,13 +48,6 @@ class PropertyDesc extends BaseDesc {
     public $type;
 
     /**
-     * Associative array of rdfs:comments values (language as a key)
-     * 
-     * @var string[]
-     */
-    public $comment = [];
-
-    /**
      * Property domain URI
      * 
      * @var string

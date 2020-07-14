@@ -41,13 +41,6 @@ class ClassDesc extends BaseDesc {
     public $class;
 
     /**
-     * Associative array of rdfs:comments values (langauge as a key)
-     * 
-     * @var string[]
-     */
-    public $comment = [];
-
-    /**
      * Array of classes this class inherits from (including the class URI itself)
      * 
      * @var string[]
