@@ -375,9 +375,18 @@ class Ontology {
                     GROUP BY 1
                 ) t3 USING (id)
                 LEFT JOIN (
-                    SELECT id, json_agg(r1.value) AS recommended
-                    FROM metadata r1
-                    WHERE r1.property = ?
+                    SELECT id, json_agg(value) AS recommended
+                    FROM (
+                        SELECT r1.id, r2.ids AS value
+                        FROM 
+                            relations r1
+                            JOIN identifiers r2 ON r1.target_id = r2.id AND r2.ids NOT LIKE ?
+                        WHERE r1.property = ?
+                      UNION
+                        SELECT id, value
+                        FROM metadata r3
+                        WHERE property = ?
+                    ) r4
                     GROUP BY 1
                 ) t4 USING (id)
         ";
@@ -392,12 +401,12 @@ class Ontology {
             RDF::SKOS_ALT_LABEL, // l1, l2
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
             RDF::RDFS_COMMENT, // c1, c2
-            $this->schema->recommended, // r1
+            $nmspSkip, $this->schema->recommended, $this->schema->recommended, // r1, r2, r3
         ];
         $query    = $this->pdo->prepare($query);
         $query->execute($param);
         while ($p        = $query->fetch(PDO::FETCH_OBJ)) {
-            $prop                           = new PropertyDesc($p);
+            $prop = new PropertyDesc($p);
             if (!empty($prop->vocabs)) {
                 $prop->setOntology($this);
             }
