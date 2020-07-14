@@ -333,7 +333,7 @@ class Ontology {
                         t.type, 
                         coalesce(m3.value, i3.ids) AS range, 
                         coalesce(m4.value, i4.ids) AS domain, 
-                        m5.value_n AS \"order\",
+                        m5.value::int AS \"order\",
                         m6.value AS langtag,
                         m7.value AS vocabs,
                         json_agg(i2.ids ORDER BY n DESC) AS properties 

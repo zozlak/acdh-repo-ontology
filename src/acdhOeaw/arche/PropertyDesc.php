@@ -92,7 +92,7 @@ class PropertyDesc extends BaseDesc {
      * achd:ordering annotation property value
      * @var int
      */
-    public $order;
+    public $order = 99999;
 
     /**
      * acdh:langTag annotation property value
