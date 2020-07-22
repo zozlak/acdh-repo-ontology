@@ -86,20 +86,33 @@ class PropertyDesc extends BaseDesc {
      * If a class is among acdh:recommendedClass for this property.
      * @var bool
      */
-    public $recommended = [];
+    public $recommendedClass = [];
+
+    /**
+     * achd:automatedFill annotation property value
+     * @var bool
+     */
+    public $automatedFill = false;
+
+    /**
+     * acdh:defaultValue annotation property value
+     * @var bool
+     */
+    public $defaultValue;
+    
+    /**
+     * acdh:langTag annotation property value
+     * @var bool
+     */
+    public $langTag = false;
+
 
     /**
      * achd:ordering annotation property value
      * @var int
      */
-    public $order = 99999;
-
-    /**
-     * acdh:langTag annotation property value
-     * @var bool
-     */
-    public $langTag;
-
+    public $ordering = 99999;
+    
     /**
      * acdh:vocabs annotation property value
      * @var string
@@ -109,7 +122,7 @@ class PropertyDesc extends BaseDesc {
     /**
      * Array of vocabulary values fetched from vocabulary pointed by acdh:vocabs
      * annotation property
-     * @var SkocConceptDesc[]
+     * @var SkosConceptDesc[]
      */
     private $vocabsValues;
 
@@ -127,7 +140,7 @@ class PropertyDesc extends BaseDesc {
         if ($name === 'vocabsValues' && $this->vocabsValues === null && !empty($this->vocabs)) {
             $this->vocabsValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
         }
-        return $this->$name;
+        return $this->$name ?? null;
     }
 
 }

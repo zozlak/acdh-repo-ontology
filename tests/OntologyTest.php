@@ -55,10 +55,6 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
 
         self::$schema = (object) [
                 'skipNamespace' => 'http://127.0.0.1/%',
-                'order'         => 'https://vocabs.acdh.oeaw.ac.at/schema#ordering',
-                'recommended'   => 'https://vocabs.acdh.oeaw.ac.at/schema#recommendedClass',
-                'langTag'       => 'https://vocabs.acdh.oeaw.ac.at/schema#langTag',
-                'vocabs'        => 'https://vocabs.acdh.oeaw.ac.at/schema#vocabs',
                 'parent'        => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
                 'label'         => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
         ];
@@ -101,7 +97,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $o = new Ontology(self::$pdo, self::$schema);
 
         $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact';
+        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor'; //defined for RepoObject
         $this->assertArrayHasKey($pUri, $c->properties);
         $this->assertEquals(1, $c->properties[$pUri]->min);
 

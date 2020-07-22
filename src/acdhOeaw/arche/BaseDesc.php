@@ -46,7 +46,7 @@ class BaseDesc {
      * @var string[]
      */
     public $comment = [];
-    
+
     /**
      * 
      * @param object $d
@@ -63,6 +63,22 @@ class BaseDesc {
                     }
                 }
             }
+            if (isset($d->annotations) && !empty($d->annotations)) {
+                foreach (json_decode($d->annotations) as $a) {
+                    $prop = preg_replace('|^.*[#/]|', '', $a->property);
+                    if (property_exists($this, $prop)) {
+                        if (is_array($this->$prop)) {
+                            if (!empty($a->lang)) {
+                                $this->$prop[$a->lang] = $a->value;
+                            } else {
+                                $this->$prop[] = $a->value;
+                            }
+                        } else {
+                            $this->$prop = $a->value;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -73,8 +89,10 @@ class BaseDesc {
     public function getComment(string $lang, string $fallbackLang = 'en'): string {
         return $this->getPropInLang('comment', $lang, $fallbackLang);
     }
-    
-    private function getPropInLang(string $property, string $lang, string $fallbackLang): string {
+
+    private function getPropInLang(string $property, string $lang,
+                                   string $fallbackLang): string {
         return $this->{$property}[$lang] ?? ($this->{$property}[$fallbackLang] ?? (reset($this->$property) ?? ''));
     }
+
 }

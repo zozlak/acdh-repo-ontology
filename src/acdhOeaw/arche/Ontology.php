@@ -324,7 +324,7 @@ class Ontology {
                     relations r 
                     JOIN t ON t.sid = r.id AND property = ?
             )
-            SELECT id, property, type, range, domain, \"order\", properties, label, comment, recommended, langtag, vocabs
+            SELECT id, property, type, range, domain, properties, label, comment, annotations
             FROM
                 (
                     SELECT 
@@ -333,9 +333,6 @@ class Ontology {
                         t.type, 
                         coalesce(m3.value, i3.ids) AS range, 
                         coalesce(m4.value, i4.ids) AS domain, 
-                        m5.value::int AS \"order\",
-                        m6.value AS langtag,
-                        m7.value AS vocabs,
                         json_agg(i2.ids ORDER BY n DESC) AS properties 
                     FROM 
                         t 
@@ -347,10 +344,7 @@ class Ontology {
                         LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
                         LEFT JOIN relations r4 ON t.id = r4.id AND r4.property = ?
                         LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids NOT LIKE ?
-                        LEFT JOIN metadata m5 ON t.id = m5.id AND m5.property = ?
-                        LEFT JOIN metadata m6 ON t.id = m6.id AND m6.property = ?
-                        LEFT JOIN metadata m7 ON t.id = m7.id AND m7.property = ?
-                    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+                    GROUP BY 1, 2, 3, 4, 5
                 ) t1
                 LEFT JOIN (
                     SELECT id, json_object(array_agg(l2.lang), array_agg(l2.value)) AS label
@@ -375,18 +369,25 @@ class Ontology {
                     GROUP BY 1
                 ) t3 USING (id)
                 LEFT JOIN (
-                    SELECT id, json_agg(value) AS recommended
+                    SELECT a1.id, json_agg(row_to_json(a1.*)) AS annotations
                     FROM (
-                        SELECT r1.id, r2.ids AS value
-                        FROM 
-                            relations r1
-                            JOIN identifiers r2 ON r1.target_id = r2.id AND r2.ids NOT LIKE ?
-                        WHERE r1.property = ?
+                        SELECT a.id, a.property, a.type, a.lang, a.value
+                        FROM
+                            metadata a
+                            JOIN identifiers i1 ON a.property = i1.ids
+                            JOIN relations r ON i1.id = r.id
+                            JOIN identifiers i2 ON r.target_id = i2.id
+                        WHERE i2.ids = ?
                       UNION
-                        SELECT id, value
-                        FROM metadata r3
-                        WHERE property = ?
-                    ) r4
+                        SELECT a.id, a.property, 'REL' AS type, null AS lang, i3.ids AS value
+                        FROM
+                            relations a
+                            JOIN identifiers i1 ON a.property = i1.ids
+                            JOIN relations r ON i1.id = r.id
+                            JOIN identifiers i2 ON r.target_id = i2.id
+                            JOIN identifiers i3 ON a.target_id = i3.id AND i3.ids NOT LIKE ?
+                        WHERE i2.ids = ?
+                    ) a1
                     GROUP BY 1
                 ) t4 USING (id)
         ";
@@ -396,12 +397,11 @@ class Ontology {
             $nmspSkip, $nmspSkip, // i1, i2
             RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspSkip, // m3, r3, i3
             RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspSkip, // m4, r4, i4
-            $this->schema->order, $this->schema->langTag, $this->schema->vocabs, // m5, m6, m7
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
             RDF::SKOS_ALT_LABEL, // l1, l2
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
             RDF::RDFS_COMMENT, // c1, c2
-            $nmspSkip, $this->schema->recommended, $this->schema->recommended, // r1, r2, r3
+            RDF::OWL_ANNOTATION_PROPERTY, $nmspSkip, RDF::OWL_ANNOTATION_PROPERTY, // a1
         ];
         $query    = $this->pdo->prepare($query);
         $query->execute($param);
@@ -483,7 +483,7 @@ class Ontology {
         foreach ($this->properties as $p) {
             foreach ($this->classesRev[$p->domain] ?? [] as $c) {
                 $pp                          = clone($p); // clone because restrictions apply to a {property, class}
-                $pp->recommended             = count(array_intersect($c->classes, $p->recommended)) > 0;
+                $pp->recommendedClass        = count(array_intersect($c->classes, $p->recommendedClass)) > 0;
                 $c->properties[$p->property] = $pp;
             }
         }
