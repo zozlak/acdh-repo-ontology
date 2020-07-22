@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\arche;
 
+use OutOfBoundsException;
+
 /**
  * A container for and RDF class description
  *
@@ -34,11 +36,11 @@ namespace acdhOeaw\arche;
 class ClassDesc extends BaseDesc {
 
     /**
-     * Class URI
+     * Class URIs
      * 
      * @var string
      */
-    public $class;
+    public $class = [];
 
     /**
      * Array of classes this class inherits from (including the class URI itself)
@@ -48,10 +50,32 @@ class ClassDesc extends BaseDesc {
     public $classes = [];
 
     /**
-     * Associative array of class properties (property URIs as keys).
+     * Associative array of class properties (property URIs as keys, if 
+     * a property has many URIs, it will exist under all of them - use the
+     * `getProperties()` method to get a distinct list of properties).
      * 
      * @var PropertyDesc[]
      */
     public $properties = [];
+
+    /**
+     * Returns distinct set of class properties
+     * 
+     * @return PropertyDesc[]
+     * @throws OutOfBoundsException
+     */
+    public function getProperties(): array {
+        $included = [];
+        $ret      = [];
+        foreach ($this->properties as $p) {
+            $hash = spl_object_hash($p);
+            if (!isset($included[$hash])) {
+                $ret[sprintf('%04d.%d', $p->ordering, $p->id)] = $p;
+                $included[$hash]                    = true;
+            }
+        }
+        ksort($ret);
+        return $ret;
+    }
 
 }

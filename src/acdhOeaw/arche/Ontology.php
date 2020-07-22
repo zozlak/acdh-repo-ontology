@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche;
 
 use PDO;
+use OutOfBoundsException;
 use EasyRdf\Resource;
 use zozlak\RdfConstants as RDF;
 
@@ -59,6 +60,12 @@ class Ontology {
      * @var PropertyDesc[]
      */
     private $properties = [];
+
+    /**
+     *
+     * @var PropertyDesc[]
+     */
+    private $distinctProperties = [];
 
     /**
      *
@@ -122,8 +129,8 @@ class Ontology {
      * between classes).
      * 
      * If no classes/RDF resource is provided all known classes are searched
-     * and a first encounterred match is returned (property cardinality and range may vary
-     * between classes).
+     * and a first encounterred match is returned (property cardinality and 
+     * range may vary between classes).
      * 
      * @param $resOrClassesArray \EasyRdf\Resource RDF resource or an array of 
      *   RDF class URIs or an RDF class URI
@@ -132,7 +139,7 @@ class Ontology {
      */
     public function getProperty($resOrClassesArray, string $property): ?PropertyDesc {
         if (empty($resOrClassesArray)) {
-            $resOrClassesArray = array_keys($this->classes);
+            $resOrClassesArray = [];
         } elseif ($resOrClassesArray instanceof Resource) {
             $resOrClassesArray = $resOrClassesArray->allResources(RDF::RDF_TYPE);
         } elseif (!is_array($resOrClassesArray)) {
@@ -169,8 +176,8 @@ class Ontology {
                 FROM
                     c
                     JOIN (
-                        SELECT id, json_agg(ids) AS uri
-                        FROM identifiers WHERE ids NOT LIKE ?
+                        SELECT id, json_agg(ids) AS concept
+                        FROM identifiers
                         GROUP BY 1
                     ) t0 USING (id)
                     JOIN (
@@ -195,7 +202,6 @@ class Ontology {
         ";
         $param = [
             $this->schema->parent, $vocabularyUrl, // WITH
-            $this->schema->skipNamespace, // t0
             $this->schema->label, // t1
             RDF::SKOS_NARROWER, // t2
             RDF::SKOS_BROADER, // t3
@@ -206,8 +212,7 @@ class Ontology {
 
         $concepts = [];
         foreach ($tmp as $i) {
-            $i->uri = $i->uri[0];
-            $langs  = array_map(function($x) {
+            $langs = array_map(function($x) {
                 return $x->lang;
             }, $i->label);
             $labels = array_map(function($x) {
@@ -225,73 +230,76 @@ class Ontology {
                 return $concepts[(string) $x];
             }, $i->narrower);
         }
-        $uris = array_map(function($x) {
-            return $x->uri;
-        }, $concepts);
-        return array_combine($uris, array_values($concepts));
+        $result = [];
+        foreach ($concepts as $c) {
+            foreach ($c->concept as $i) {
+                $result[$i] = $c;
+            }
+        }
+        return $result;
     }
 
     private function loadClasses(): void {
-        $nmspSkip = $this->schema->skipNamespace;
-        $query    = "
-            WITH RECURSIVE t(sid, id, n) AS (
+        $query = "
+            WITH RECURSIVE t(pid, id, n) AS (
                 SELECT DISTINCT id, id, 0
                 FROM
                     identifiers
                     JOIN metadata USING (id)
                 WHERE
-                    ids NOT LIKE ?
-                    AND property = ?
+                    property = ?
                     AND value = ?
               UNION
                 SELECT r.target_id, t.id, t.n + 1
                 FROM
                     relations r 
-                    JOIN t ON t.sid = r.id AND property = ?
+                    JOIN t ON t.pid = r.id AND (property = ? OR property = ?)
+            ),
+            tt AS (
+                SELECT id, json_agg(pid ORDER BY n DESC) AS pids
+                FROM t
+                GROUP BY 1
             )
-            SELECT c1.id, class, classes, label, comment
+            SELECT id, pids, class, classes, label, comment 
             FROM
-                (
-                    SELECT t.id, i1.ids AS class, json_agg(i2.ids ORDER BY n DESC) AS classes 
-                    FROM 
-                        t 
-                        JOIN identifiers i1 ON t.id = i1.id AND i1.ids NOT LIKE ?
-                        JOIN identifiers i2 ON t.sid = i2.id AND i2.ids NOT LIKE ?
-                    GROUP BY 1, 2
-                ) c1
-                LEFT JOIN (
-                    SELECT id, json_object(array_agg(m2.lang), array_agg(m2.value)) AS label
-                    FROM 
-                        metadata m1
-                        JOIN metadata m2 USING (id)
-                    WHERE
-                        m1.property = ?
-                        AND substring(m1.value, 1, 1000) = ?
-                        AND m2.property = ?
+                tt
+                JOIN (
+                    SELECT id, json_agg(ids) AS class
+                    FROM tt JOIN identifiers USING (id)
+                    GROUP BY 1
+                ) c1 USING (id)
+                JOIN (
+                    SELECT t.id, json_agg(ids ORDER BY n DESC) AS classes 
+                    FROM t JOIN identifiers i ON t.pid = i.id
                     GROUP BY 1
                 ) c2 USING (id)
                 LEFT JOIN (
-                    SELECT id, json_object(array_agg(m2.lang), array_agg(m2.value)) AS comment
-                    FROM 
-                        metadata m1
-                        JOIN metadata m2 USING (id)
-                    WHERE
-                        m1.property = ?
-                        AND substring(m1.value, 1, 1000) = ?
-                        AND m2.property = ?
+                    SELECT id, json_object(array_agg(lang), array_agg(value)) AS label
+                    FROM tt JOIN metadata USING (id)
+                    WHERE property = ?
                     GROUP BY 1
                 ) c3 USING (id)
+                LEFT JOIN (
+                    SELECT id, json_object(array_agg(lang), array_agg(value)) AS comment
+                    FROM tt JOIN metadata USING (id)
+                    WHERE property = ?
+                    GROUP BY 1
+                ) c4 USING (id)
         ";
-        $param    = [
-            $nmspSkip, RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::RDFS_SUB_CLASS_OF, // with
-            $nmspSkip, $nmspSkip, // normal query - classes
-            RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::SKOS_ALT_LABEL, // normal query - label
-            RDF::RDF_TYPE, RDF::OWL_CLASS, RDF::RDFS_COMMENT, // normal query - comment
+        $param = [
+            RDF::RDF_TYPE, RDF::OWL_CLASS, // with non-recursive
+            RDF::RDFS_SUB_CLASS_OF, RDF::OWL_EQUIVALENT_CLASS, // with recursive
+            RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c3 (label), c4 (comment)
         ];
-        $query    = $this->pdo->prepare($query);
+        $query = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($c        = $query->fetch(PDO::FETCH_OBJ)) {
-            $this->classes[$c->class] = new ClassDesc($c);
+        while ($c     = $query->fetch(PDO::FETCH_OBJ)) {
+            $classList = json_decode($c->class);
+            $cc        = new ClassDesc($c, $classList, $this->schema->ontologyNamespace);
+            foreach ($classList as $i) {
+                $this->classes[$i] = $cc;
+            }
+            $this->classes[(string) $c->id] = $cc;
         }
 
         // reverse class index (from a class to all inheriting from it)
@@ -300,170 +308,150 @@ class Ontology {
                 if (!isset($this->classesRev[$cStr])) {
                     $this->classesRev[$cStr] = [];
                 }
-                $this->classesRev[$cStr][] = $this->classes[$c->class];
+                $this->classesRev[$cStr][] = $this->classes[$c->class[0]];
             }
         }
     }
 
     private function loadProperties(): void {
-        $nmspSkip = $this->schema->skipNamespace;
-        // slightly more complex to deal with rdfs:range and rdfs:domain no matter if they are stored as relations or literals-like
-        $query    = "
-            WITH RECURSIVE t(sid, id, type, n) AS (
+        $query = "
+            WITH RECURSIVE t(id, pid, type, n) AS (
                 SELECT DISTINCT id, id, value, 0
                 FROM 
                     identifiers
                     JOIN metadata USING (id)
                 WHERE 
-                    ids LIKE ?
-                    AND property = ?
+                    property = ?
                     AND substring(value, 1, 1000) IN (?, ?)
               UNION
-                SELECT r.target_id, t.id, t.type, t.n + 1
+                SELECT r.target_id, t.pid, t.type, t.n + 1
                 FROM
                     relations r 
-                    JOIN t ON t.sid = r.id AND property = ?
+                    JOIN t ON t.id = r.id AND (property = ? OR property = ?)
+            ),
+            tt AS (
+                SELECT id, type, json_agg(pid ORDER BY n DESC) AS pids
+                FROM t
+                GROUP BY 1, 2
+            ),
+            ap AS (
+                SELECT i1.ids AS property
+                FROM
+                    identifiers i1
+                    JOIN relations r USING (id)
+                    JOIN identifiers i2 ON r.target_id = i2.id
+                WHERE
+                    r.property = ?
+                    AND i2.ids = ? 
             )
-            SELECT id, property, type, range, domain, properties, label, comment, annotations
+            SELECT tt.id, tt.pids, tt.type, property, properties, range, domain, label, comment, annotations
             FROM
-                (
-                    SELECT 
-                        t.id, 
-                        i1.ids AS property, 
-                        t.type, 
-                        coalesce(m3.value, i3.ids) AS range, 
-                        coalesce(m4.value, i4.ids) AS domain, 
-                        json_agg(i2.ids ORDER BY n DESC) AS properties 
-                    FROM 
-                        t 
-                        JOIN identifiers i1 ON t.id = i1.id AND i1.ids NOT LIKE ?
-                        JOIN identifiers i2 ON t.sid = i2.id AND i2.ids NOT LIKE ?
-                        LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
-                        LEFT JOIN relations r3 ON t.id = r3.id AND r3.property = ?
-                        LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids NOT LIKE ?
-                        LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
-                        LEFT JOIN relations r4 ON t.id = r4.id AND r4.property = ?
-                        LEFT JOIN identifiers i4 ON r4.target_id = i4.id AND i4.ids NOT LIKE ?
-                    GROUP BY 1, 2, 3, 4, 5
-                ) t1
-                LEFT JOIN (
-                    SELECT id, json_object(array_agg(l2.lang), array_agg(l2.value)) AS label
-                    FROM 
-                        metadata l1
-                        JOIN metadata l2 USING (id)
-                    WHERE
-                        l1.property = ?
-                        AND substring(l1.value, 1, 1000) IN (?, ?)
-                        AND l2.property = ?
+                tt
+                JOIN (
+                    SELECT id, json_agg(ids) AS property
+                    FROM tt JOIN identifiers USING (id)
                     GROUP BY 1
-                ) t2 USING (id)
-                LEFT JOIN (
-                    SELECT id, json_object(array_agg(c2.lang), array_agg(c2.value)) AS comment
-                    FROM 
-                        metadata c1
-                        JOIN metadata c2 USING (id)
-                    WHERE
-                        c1.property = ?
-                        AND substring(c1.value, 1, 1000) IN (?, ?)
-                        AND c2.property = ?
+                ) c1 USING (id)
+                JOIN (
+                    SELECT t.id, json_agg(ids ORDER BY n DESC) AS properties 
+                    FROM t JOIN identifiers i ON t.pid = i.id
                     GROUP BY 1
-                ) t3 USING (id)
+                ) c2 USING (id)
+                LEFT JOIN (
+                    SELECT r.id, json_agg(ids) AS range
+                    FROM relations r JOIN identifiers i ON r.target_id = i.id AND r.property = ?
+                    GROUP BY 1
+                ) c3 USING (id)
+                LEFT JOIN (
+                    SELECT r.id, json_agg(ids) AS domain
+                    FROM relations r JOIN identifiers i ON r.target_id = i.id AND r.property = ?
+                    GROUP BY 1
+                ) c4 USING (id)
+                LEFT JOIN (
+                    SELECT id, json_object(array_agg(lang), array_agg(value)) AS label
+                    FROM tt JOIN metadata USING (id)
+                    WHERE property = ?
+                    GROUP BY 1
+                ) c5 USING (id)
+                LEFT JOIN (
+                    SELECT id, json_object(array_agg(lang), array_agg(value)) AS comment
+                    FROM tt JOIN metadata USING (id)
+                    WHERE property = ?
+                    GROUP BY 1
+                ) c6 USING (id)
                 LEFT JOIN (
                     SELECT a1.id, json_agg(row_to_json(a1.*)) AS annotations
                     FROM (
-                        SELECT a.id, a.property, a.type, a.lang, a.value
-                        FROM
-                            metadata a
-                            JOIN identifiers i1 ON a.property = i1.ids
-                            JOIN relations r ON i1.id = r.id
-                            JOIN identifiers i2 ON r.target_id = i2.id
-                        WHERE i2.ids = ?
+                        SELECT id, property, type, lang, value
+                        FROM metadata a JOIN ap USING (property)
                       UNION
-                        SELECT a.id, a.property, 'REL' AS type, null AS lang, i3.ids AS value
-                        FROM
-                            relations a
-                            JOIN identifiers i1 ON a.property = i1.ids
-                            JOIN relations r ON i1.id = r.id
-                            JOIN identifiers i2 ON r.target_id = i2.id
-                            JOIN identifiers i3 ON a.target_id = i3.id AND i3.ids NOT LIKE ?
-                        WHERE i2.ids = ?
+                        SELECT id, property, 'REL' AS type, null AS lang, target_id::text AS value
+                        FROM relations JOIN ap USING (property)
                     ) a1
                     GROUP BY 1
-                ) t4 USING (id)
+                ) c7 USING (id)
         ";
-        $param    = [
-            $nmspSkip, RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
-            RDF::RDFS_SUB_PROPERTY_OF, // with recursive term
-            $nmspSkip, $nmspSkip, // i1, i2
-            RDF::RDFS_RANGE, RDF::RDFS_RANGE, $nmspSkip, // m3, r3, i3
-            RDF::RDFS_DOMAIN, RDF::RDFS_DOMAIN, $nmspSkip, // m4, r4, i4
-            RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
-            RDF::SKOS_ALT_LABEL, // l1, l2
-            RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY,
-            RDF::RDFS_COMMENT, // c1, c2
-            RDF::OWL_ANNOTATION_PROPERTY, $nmspSkip, RDF::OWL_ANNOTATION_PROPERTY, // a1
+        $param = [
+            RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
+            RDF::RDFS_SUB_PROPERTY_OF, RDF::OWL_EQUIVALENT_PROPERTY, // with recursive term
+            $this->schema->parent, RDF::OWL_ANNOTATION_PROPERTY, // ap
+            RDF::RDFS_RANGE, RDF::RDFS_DOMAIN, // c3, c4
+            RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c5, c6
         ];
-        $query    = $this->pdo->prepare($query);
+        $query = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($p        = $query->fetch(PDO::FETCH_OBJ)) {
-            $prop = new PropertyDesc($p);
+        while ($p     = $query->fetch(PDO::FETCH_OBJ)) {
+            $propList = json_decode($p->property);
+            $prop     = new PropertyDesc($p, $propList, $this->schema->ontologyNamespace);
             if (!empty($prop->vocabs)) {
                 $prop->setOntology($this);
             }
-            $this->properties[$p->property] = $prop;
+            foreach ($propList as $i) {
+                $this->properties[$i] = $prop;
+            }
+            $this->properties[(string) $p->id]         = $prop;
+            $this->distinctProperties[(string) $p->id] = $prop;
         }
     }
 
     private function loadRestrictions(): void {
-        $nmspSkip = $this->schema->skipNamespace;
-        // slightly more complex to deal with owl:onDataRange and owl:onClass no matter if they are stored as relations or literals-like
-        $query    = "
+        $query = "
             SELECT 
-                t.id, 
-                t.ids AS class,
-                coalesce(m1.value, i1.ids) AS onProperty,
-                coalesce(m2.value, i2.ids, m3.value, i3.ids) AS range,
-                coalesce(m8.value, m5.value, m7.value, m4.value) AS min,
-                coalesce(m9.value, m6.value, m7.value, m4.value) AS max
+                t.id, class, onproperty, 
+                coalesce(m3.value, m2.value) AS min,
+                coalesce(m4.value, m2.value) AS max
             FROM
                 (
-                    SELECT id, ids
+                    SELECT i1.id, json_agg(i1.ids) AS class
                     FROM 
-                        identifiers
-                        JOIN metadata USING (id)
-                    WHERE 
-                        ids NOT LIKE ?
-                        AND property = ?
-                        AND value = ?
+                        identifiers i1
+                        JOIN relations r USING (id)
+                        JOIN identifiers i2 ON r.target_id = i2.id AND r.property = ? AND i2.ids = ?
+                    GROUP BY 1
                 ) t
-                LEFT JOIN metadata m1 ON t.id = m1.id AND m1.property = ?
-                LEFT JOIN relations r1 ON t.id = r1.id AND r1.property = ?
-                LEFT JOIN identifiers i1 ON r1.target_id = i1.id AND i1.ids NOT LIKE ?
+                LEFT JOIN (
+                    SELECT r.id, json_agg(ids) AS onproperty
+                    FROM relations r JOIN identifiers i ON r.target_id = i.id AND r.property = ?
+                    GROUP BY 1
+                ) c1 USING (id)
                 LEFT JOIN metadata m2 ON t.id = m2.id AND m2.property = ?
-                LEFT JOIN relations r2 ON t.id = r2.id AND r2.property = ?
-                LEFT JOIN identifiers i2 ON r2.target_id = i2.id AND i2.ids NOT LIKE ?
                 LEFT JOIN metadata m3 ON t.id = m3.id AND m3.property = ?
-                LEFT JOIN relations r3 ON t.id = r3.id AND r3.property = ?
-                LEFT JOIN identifiers i3 ON r3.target_id = i3.id AND i3.ids NOT LIKE ?
                 LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
-                LEFT JOIN metadata m5 ON t.id = m5.id AND m5.property = ?
-                LEFT JOIN metadata m6 ON t.id = m6.id AND m6.property = ?
-                LEFT JOIN metadata m7 ON t.id = m7.id AND m7.property = ?
-                LEFT JOIN metadata m8 ON t.id = m8.id AND m8.property = ?            
-                LEFT JOIN metadata m9 ON t.id = m9.id AND m9.property = ?
         ";
-        $param    = [
-            $nmspSkip, RDF::RDF_TYPE, RDF::OWL_RESTRICTION,
-            RDF::OWL_ON_PROPERTY, RDF::OWL_ON_PROPERTY, $nmspSkip, // m1, r1, i1
-            RDF::OWL_ON_CLASS, RDF::OWL_ON_CLASS, $nmspSkip, // m2, r2, i2
-            RDF::OWL_ON_DATA_RANGE, RDF::OWL_ON_DATA_RANGE, $nmspSkip, // m3, r3, i3
-            RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY, RDF::OWL_MAX_CARDINALITY, // m4, m5, m6
-            RDF::OWL_QUALIFIED_CARDINALITY, RDF::OWL_MIN_QUALIFIED_CARDINALITY, RDF::OWL_MAX_QUALIFIED_CARDINALITY, // m7, m8, m9
+        $param = [
+            $this->schema->parent, RDF::OWL_RESTRICTION, // t
+            RDF::OWL_ON_PROPERTY, // c1
+            RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY, RDF::OWL_MAX_CARDINALITY, // m2, m3, m4
         ];
-        $query    = $this->pdo->prepare($query);
+        $query = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($r        = $query->fetch(PDO::FETCH_OBJ)) {
-            $this->restrictions[$r->class] = new RestrictionDesc($r);
+        while ($r     = $query->fetch(PDO::FETCH_OBJ)) {
+            $classList = json_decode($r->class);
+            $rr        = new RestrictionDesc($r);
+            foreach ($classList as $i) {
+                $this->restrictions[$i] = $rr;
+            }
+            $this->restrictions[(string) $r->id] = $rr;
         }
     }
 
@@ -480,34 +468,49 @@ class Ontology {
         }
 
         // assign properties to classes
-        foreach ($this->properties as $p) {
-            foreach ($this->classesRev[$p->domain] ?? [] as $c) {
-                $pp                          = clone($p); // clone because restrictions apply to a {property, class}
-                $pp->recommendedClass        = count(array_intersect($c->classes, $p->recommendedClass)) > 0;
-                $c->properties[$p->property] = $pp;
+        $classes = array_keys($this->classes);
+        foreach ($this->distinctProperties as $p) {
+            $classMatch       = array_intersect($p->domain, $classes);
+            $processedClasses = [];
+            foreach ($classMatch as $cid) {
+                foreach ($this->classesRev[$cid] as $c) {
+                    $cHash = (string) spl_object_id($c);
+                    if (!isset($processedClasses[$cHash])) {
+                        $pp                   = clone($p); // clone because restrictions apply to a {property, class}
+                        $pp->recommendedClass = count(array_intersect($c->classes, $p->recommendedClass)) > 0;
+                        foreach ($pp->property as $puri) {
+                            $c->properties[$puri] = $pp;
+                        }
+                        $processedClasses[$cHash] = true;
+                    }
+                }
             }
         }
 
         // process restrictions
+        $restrClasses = array_keys($this->restrictions);
         foreach ($this->classes as $c) {
-            foreach ($c->classes as $cStr) {
-                if (!isset($this->restrictions[$cStr])) {
-                    continue;
-                }
-                $r = $this->restrictions[$cStr];
-                if (!isset($c->properties[$r->onProperty])) {
-                    continue;
-                }
-                $p = $c->properties[$r->onProperty];
-
-                if (!empty($r->range)) {
-                    $p->range = $r->range;
-                }
-                if (!empty($r->min)) {
-                    $p->min = $r->min;
-                }
-                if (!empty($r->max)) {
-                    $p->max = $r->max;
+            $restrMatch     = array_intersect($restrClasses, $c->classes);
+            $processedRestr = [];
+            foreach ($restrMatch as $rid) {
+                $r     = $this->restrictions[$rid];
+                $rHash = (string) spl_object_id($r);
+                if (!isset($processedRestr[$rHash])) {
+                    try {
+                        $processedRestr[$rHash] = true;
+                        $p                      = $c->properties[$r->onProperty[0]];
+                        if (!empty($r->range)) {
+                            $p->range = $r->range;
+                        }
+                        if (!empty($r->min)) {
+                            $p->min = $r->min;
+                        }
+                        if (!empty($r->max)) {
+                            $p->max = $r->max;
+                        }
+                    } catch (OutOfBoundsException $e) {
+                        
+                    }
                 }
             }
         }

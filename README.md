@@ -17,9 +17,9 @@ An API for the ACDH ontology stored in an ARCHE repository.
 ```php
 $conn = new PDO('pgsql: repo db connection details');
 $cfg = (object) [
-    'skipNamespace' => 'https://repository.base/url/%', // don't forget the '%' at the end!
-    'parent'        => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
-    'label'         => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
+    'ontologyNamespace' => 'https://vocabs.acdh.oeaw.ac.at/schema#',
+    'parent'            => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
+    'label'             => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
 ];
 
 $ontology = new \acdhOeaw\arche\Ontology($conn, $cfg);

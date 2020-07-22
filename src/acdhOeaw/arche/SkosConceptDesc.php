@@ -34,7 +34,7 @@ namespace acdhOeaw\arche;
 class SkosConceptDesc extends BaseDesc {
 
     public $id;
-    public $uri;
+    public $concept  = [];
     public $broader  = [];
     public $narrower = [];
 

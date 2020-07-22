@@ -34,11 +34,11 @@ namespace acdhOeaw\arche;
 class PropertyDesc extends BaseDesc {
 
     /**
-     * Property URI
+     * Property URIs
      * 
      * @var string
      */
-    public $property;
+    public $property = [];
 
     /**
      * Property type URI (owl:DatatypeProperty or owl:ObjectProperty)
@@ -52,7 +52,7 @@ class PropertyDesc extends BaseDesc {
      * 
      * @var string
      */
-    public $domain;
+    public $domain = [];
 
     /**
      * Property URIs of all properties this one inhertis from (includint itself)
@@ -66,7 +66,7 @@ class PropertyDesc extends BaseDesc {
      * 
      * @var string
      */
-    public $range;
+    public $range = [];
 
     /**
      * Minimum count
@@ -99,20 +99,19 @@ class PropertyDesc extends BaseDesc {
      * @var bool
      */
     public $defaultValue;
-    
+
     /**
      * acdh:langTag annotation property value
      * @var bool
      */
     public $langTag = false;
 
-
     /**
      * achd:ordering annotation property value
      * @var int
      */
     public $ordering = 99999;
-    
+
     /**
      * acdh:vocabs annotation property value
      * @var string
@@ -141,6 +140,23 @@ class PropertyDesc extends BaseDesc {
             $this->vocabsValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
         }
         return $this->$name ?? null;
+    }
+
+    public function getVocabsValues($lang = 'en'): array {
+        $included = [];
+        $ret      = [];
+        if ($this->vocabsValues === null && !empty($this->vocabs)) {
+            $this->vocabsValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
+        }
+        foreach ($this->vocabsValues ?? [] as $v) {
+            $hash = spl_object_hash($v);
+            if (!isset($included[$hash])) {
+                $ret[$v->getLabel($lang)] = $v;
+                $included[$hash]          = true;
+            }
+        }
+        ksort($ret);
+        return array_values($ret);
     }
 
 }

@@ -54,9 +54,9 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         self::$schema = (object) [
-                'skipNamespace' => 'http://127.0.0.1/%',
-                'parent'        => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
-                'label'         => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
+                'ontologyNamespace' => 'https://vocabs.acdh.oeaw.ac.at/schema#',
+                'parent'            => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
+                'label'             => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
         ];
     }
 
@@ -93,6 +93,14 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertTrue($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
     }
 
+    public function testClassGetProperties(): void {
+        $o = new Ontology(self::$pdo, self::$schema);
+        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $p = $c->getProperties();
+        $this->assertEquals(count(array_unique(array_map('spl_object_id', $p))), count($p));
+        $this->assertEquals(count(array_unique(array_map('spl_object_id', $c->properties))), count($p));
+    }    
+    
     public function testCardinalitiesIndirect(): void {
         $o = new Ontology(self::$pdo, self::$schema);
 
@@ -127,8 +135,8 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $o = new Ontology(self::$pdo, self::$schema);
         $r = (new Graph())->resource('.');
         $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasUpdatedDate');
-        $this->assertEquals('http://www.w3.org/2001/XMLSchema#date', $p->range);
-        $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/schema#Main', $p->domain);
+        $this->assertContains('http://www.w3.org/2001/XMLSchema#date', $p->range);
+        $this->assertContains('https://vocabs.acdh.oeaw.ac.at/schema#Main', $p->domain);
     }
 
     public function testPropertyLabelComment(): void {
@@ -163,6 +171,15 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'));
         $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'));
         $this->assertEquals('Namensnennung 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'de'));
+    }
+
+    public function testPropertyGetVocabsValues(): void {
+        $o = new Ontology(self::$pdo, self::$schema);
+        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+        $vv = $p->getVocabsValues();
+        $this->assertEquals(count(array_unique(array_map('spl_object_id', $vv))), count($vv));
+        $this->assertEquals(count(array_unique(array_map('spl_object_id', $p->vocabsValues))), count($vv));
     }
 
     public function testPropertyByClassUri(): void {

@@ -34,6 +34,20 @@ namespace acdhOeaw\arche;
 class BaseDesc {
 
     /**
+     * Internal id of a corresponding repository resource
+     * 
+     * @var int
+     */
+    public $id;
+    
+    /**
+     * The ontology entity URI within the ontology namespace
+     * 
+     * @var string
+     */
+    public $uri;
+    
+    /**
      * Associative array of label values (langauge as a key)
      * 
      * @var string[]
@@ -50,8 +64,18 @@ class BaseDesc {
     /**
      * 
      * @param object $d
+     * @param array $ids
+     * @param string $nmsp
      */
-    public function __construct(object $d = null) {
+    public function __construct(object $d = null, array $ids = [], string $nmsp = null) {
+        $nmspL = strlen($nmsp);
+        foreach ($ids as $i){
+            if ($nmspL > 0 && substr($i, 0, $nmspL) === $nmsp) {
+                $this->uri = $i;
+                break;
+            }
+        }
+        
         if ($d !== null) {
             foreach ($this as $k => $v) {
                 $dk = strtolower($k);

@@ -37,19 +37,13 @@ class RestrictionDesc extends BaseDesc {
      *
      * @var string
      */
-    public $class;
+    public $class = [];
 
     /**
      *
      * @var string
      */
-    public $onProperty;
-
-    /**
-     *
-     * @var string
-     */
-    public $range;
+    public $onProperty = [];
 
     /**
      *
