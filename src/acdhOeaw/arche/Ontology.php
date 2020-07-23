@@ -495,7 +495,7 @@ class Ontology {
             foreach ($restrMatch as $rid) {
                 $r     = $this->restrictions[$rid];
                 $rHash = (string) spl_object_id($r);
-                if (!isset($processedRestr[$rHash])) {
+                if (!isset($processedRestr[$rHash]) && isset($c->properties[$r->onProperty[0]])) {
                     try {
                         $processedRestr[$rHash] = true;
                         $p                      = $c->properties[$r->onProperty[0]];

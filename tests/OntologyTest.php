@@ -101,19 +101,19 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals(count(array_unique(array_map('spl_object_id', $c->properties))), count($p));
     }    
     
-//    public function testCardinalitiesIndirect(): void {
-//        $o = new Ontology(self::$pdo, self::$schema);
-//
-//        $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-//        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor'; //defined for RepoObject
-//        $this->assertArrayHasKey($pUri, $c->properties);
-//        $this->assertEquals(1, $c->properties[$pUri]->min);
-//
-//        $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
-//        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasNote';
-//        $this->assertArrayHasKey($pUri, $c->properties);
-//        $this->assertNull($c->properties[$pUri]->min);
-//    }
+    public function testCardinalitiesIndirect(): void {
+        $o = new Ontology(self::$pdo, self::$schema);
+
+        $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor'; //defined for RepoObject
+        $this->assertArrayHasKey($pUri, $c->properties);
+        $this->assertEquals(1, $c->properties[$pUri]->min);
+
+        $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
+        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasNote';
+        $this->assertArrayHasKey($pUri, $c->properties);
+        $this->assertNull($c->properties[$pUri]->min);
+    }
 
     public function testCardinalitiesDirect(): void {
         $o = new Ontology(self::$pdo, self::$schema);
