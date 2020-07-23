@@ -264,12 +264,12 @@ class Ontology {
             FROM
                 tt
                 JOIN (
-                    SELECT id, json_agg(ids) AS class
+                    SELECT id, json_agg(ids ORDER BY ids) AS class
                     FROM tt JOIN identifiers USING (id)
                     GROUP BY 1
                 ) c1 USING (id)
                 JOIN (
-                    SELECT t.id, json_agg(ids ORDER BY n DESC) AS classes 
+                    SELECT t.id, json_agg(ids ORDER BY n DESC, ids) AS classes 
                     FROM t JOIN identifiers i ON t.pid = i.id
                     GROUP BY 1
                 ) c2 USING (id)
@@ -348,12 +348,12 @@ class Ontology {
             FROM
                 tt
                 JOIN (
-                    SELECT id, json_agg(ids) AS property
+                    SELECT id, json_agg(ids ORDER BY ids) AS property
                     FROM tt JOIN identifiers USING (id)
                     GROUP BY 1
                 ) c1 USING (id)
                 JOIN (
-                    SELECT t.id, json_agg(ids ORDER BY n DESC) AS properties 
+                    SELECT t.id, json_agg(ids ORDER BY n DESC, ids) AS properties 
                     FROM t JOIN identifiers i ON t.pid = i.id
                     GROUP BY 1
                 ) c2 USING (id)
@@ -422,7 +422,7 @@ class Ontology {
                 coalesce(m4.value, m2.value) AS max
             FROM
                 (
-                    SELECT i1.id, json_agg(i1.ids) AS class
+                    SELECT i1.id, json_agg(i1.ids ORDER BY i1.ids) AS class
                     FROM 
                         identifiers i1
                         JOIN relations r USING (id)
