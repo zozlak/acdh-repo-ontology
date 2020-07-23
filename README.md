@@ -10,7 +10,7 @@ An API for the ACDH ontology stored in an ARCHE repository.
 
 ## Installation
 
-`composer require arche-lib-schema`
+`composer require acdh-oeaw/arche-lib-schema`
 
 ## Usage
 
