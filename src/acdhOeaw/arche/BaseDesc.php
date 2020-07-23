@@ -75,6 +75,9 @@ class BaseDesc {
                 break;
             }
         }
+        if (empty($this->uri)) {
+            $this->uri = $ids[0] ?? null;
+        }
         
         if ($d !== null) {
             foreach ($this as $k => $v) {
