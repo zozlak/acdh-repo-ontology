@@ -253,7 +253,7 @@ class Ontology {
                 SELECT r.target_id, t.id, t.n + 1
                 FROM
                     relations r 
-                    JOIN t ON t.pid = r.id AND (property = ? OR property = ?)
+                    JOIN t ON t.pid = r.id AND (property = ? OR property = ?) AND n < 30
             ),
             tt AS (
                 SELECT id, json_agg(pid ORDER BY n DESC) AS pids
@@ -327,7 +327,7 @@ class Ontology {
                 SELECT r.target_id, t.pid, t.type, t.n + 1
                 FROM
                     relations r 
-                    JOIN t ON t.id = r.id AND (property = ? OR property = ?)
+                    JOIN t ON t.id = r.id AND (property = ? OR property = ?) AND n < 30
             ),
             tt AS (
                 SELECT id, type, json_agg(pid ORDER BY n DESC) AS pids
