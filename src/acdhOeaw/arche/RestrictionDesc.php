@@ -35,7 +35,7 @@ class RestrictionDesc extends BaseDesc {
 
     /**
      *
-     * @var string
+     * @var string[]
      */
     public $class = [];
 

@@ -36,7 +36,7 @@ class PropertyDesc extends BaseDesc {
     /**
      * Property URIs
      * 
-     * @var string
+     * @var string[]
      */
     public $property = [];
 

@@ -38,7 +38,7 @@ class ClassDesc extends BaseDesc {
     /**
      * Class URIs
      * 
-     * @var string
+     * @var string[]
      */
     public $class = [];
 
