@@ -76,14 +76,18 @@ class Ontology {
     /**
      * 
      * @param PDO $pdo
-     * @param object $schema
+     * @param object $schema the schema configuration object which must contain
+     *   `ontologyNamespace`, `parent` and `label` properties
+     * @param bool $equivalent should equivalent classes/properties be included
+     *   in the class/property inheritance tree
      */
-    public function __construct(PDO $pdo, object $schema) {
+    public function __construct(PDO $pdo, object $schema,
+                                bool $equivalent = false) {
         $this->pdo    = $pdo;
         $this->schema = $schema;
 
-        $this->loadClasses();
-        $this->loadProperties();
+        $this->loadClasses($equivalent);
+        $this->loadProperties($equivalent);
         $this->loadRestrictions();
         $this->preprocess();
     }
@@ -239,8 +243,9 @@ class Ontology {
         return $result;
     }
 
-    private function loadClasses(): void {
-        $query = "
+    private function loadClasses(bool $equivalent): void {
+        $equivalent = $equivalent ? RDF::OWL_EQUIVALENT_CLASS : '';
+        $query      = "
             WITH RECURSIVE t(pid, id, n) AS (
                 SELECT DISTINCT id, id, 0
                 FROM
@@ -286,14 +291,14 @@ class Ontology {
                     GROUP BY 1
                 ) c4 USING (id)
         ";
-        $param = [
+        $param      = [
             RDF::RDF_TYPE, RDF::OWL_CLASS, // with non-recursive
-            RDF::RDFS_SUB_CLASS_OF, RDF::OWL_EQUIVALENT_CLASS, // with recursive
+            RDF::RDFS_SUB_CLASS_OF, $equivalent, // with recursive
             RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c3 (label), c4 (comment)
         ];
-        $query = $this->pdo->prepare($query);
+        $query      = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($c     = $query->fetch(PDO::FETCH_OBJ)) {
+        while ($c          = $query->fetch(PDO::FETCH_OBJ)) {
             $classList = json_decode($c->class);
             $cc        = new ClassDesc($c, $classList, $this->schema->ontologyNamespace);
             foreach ($classList as $i) {
@@ -313,8 +318,9 @@ class Ontology {
         }
     }
 
-    private function loadProperties(): void {
-        $query = "
+    private function loadProperties(bool $equivalent): void {
+        $equivalent = $equivalent ? RDF::OWL_EQUIVALENT_PROPERTY : '';
+        $query      = "
             WITH RECURSIVE t(id, pid, type, n) AS (
                 SELECT DISTINCT id, id, value, 0
                 FROM 
@@ -391,16 +397,16 @@ class Ontology {
                     GROUP BY 1
                 ) c7 USING (id)
         ";
-        $param = [
+        $param      = [
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
-            RDF::RDFS_SUB_PROPERTY_OF, RDF::OWL_EQUIVALENT_PROPERTY, // with recursive term
+            RDF::RDFS_SUB_PROPERTY_OF, $equivalent, // with recursive term
             $this->schema->parent, RDF::OWL_ANNOTATION_PROPERTY, // ap
             RDF::RDFS_RANGE, RDF::RDFS_DOMAIN, // c3, c4
             RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c5, c6
         ];
-        $query = $this->pdo->prepare($query);
+        $query      = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($p     = $query->fetch(PDO::FETCH_OBJ)) {
+        while ($p          = $query->fetch(PDO::FETCH_OBJ)) {
             $propList = json_decode($p->property);
             $prop     = new PropertyDesc($p, $propList, $this->schema->ontologyNamespace);
             if (!empty($prop->vocabs)) {
