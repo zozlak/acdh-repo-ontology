@@ -99,7 +99,7 @@ class Ontology {
     public function __construct(PDO $pdo, object $config) {
         $this->pdo    = $pdo;
         $this->config = $config;
-        
+
         $this->config->equivalent = $this->config->equivalent ?? false;
 
         $mode    = $this->config->cacheMode ?? OntologyCache::MODE_NONE;
@@ -116,6 +116,11 @@ class Ontology {
             $this->loadClasses();
             $this->loadProperties();
             $this->loadRestrictions();
+            if ($this->config->cacheMode !== OntologyCache::MODE_NONE) {
+                foreach ($this->distinctProperties as $p) {
+                    $discard = $p->vocabsValues;
+                }
+            }
             $this->preprocess();
 
             $this->pdo = null;
@@ -245,6 +250,7 @@ class Ontology {
         $query = $this->pdo->prepare($query);
         $query->execute($param);
         $tmp   = json_decode($query->fetchColumn());
+        $tmp   = is_array($tmp) ? $tmp : [];
 
         $concepts = [];
         foreach ($tmp as $i) {
@@ -353,19 +359,19 @@ class Ontology {
     private function loadProperties(): void {
         $equivalent = $this->config->equivalent ? RDF::OWL_EQUIVALENT_PROPERTY : '';
         $query      = "
-            WITH RECURSIVE t(id, pid, type, n) AS (
+            WITH RECURSIVE t(pid, id, type, n) AS (
                 SELECT DISTINCT id, id, value, 0
                 FROM 
                     identifiers
                     JOIN metadata USING (id)
                 WHERE 
-                    property = ?
+                    property = ?    
                     AND substring(value, 1, 1000) IN (?, ?)
               UNION
-                SELECT r.target_id, t.pid, t.type, t.n + 1
+                SELECT r.target_id, t.id, t.type, t.n + 1
                 FROM
                     relations r 
-                    JOIN t ON t.id = r.id AND (property = ? OR property = ?) AND n < 30
+                    JOIN t ON t.pid = r.id AND (property = ? OR property = ?) AND n < 30
             ),
             tt AS (
                 SELECT id, type, json_agg(pid ORDER BY n DESC) AS pids
