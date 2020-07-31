@@ -463,7 +463,9 @@ class Ontology {
         // inherit property range
         foreach ($this->properties as $p) {
             for ($i = 1; empty($this->range) && $i < count($p->properties); $i++) {
-                $this->property = $this->properties[$p->properties[$i]]->range;
+                if (isset($this->properties[$p->properties[$i]])) {
+                    $this->property = $this->properties[$p->properties[$i]]->range;
+                }
             }
         }
 
