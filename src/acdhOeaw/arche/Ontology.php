@@ -41,7 +41,7 @@ use zozlak\RdfConstants as RDF;
 class Ontology {
 
     private $pdo;
-    private $config;
+    private $schema;
 
     /**
      *
@@ -76,57 +76,16 @@ class Ontology {
     /**
      * 
      * @param PDO $pdo
-     * @param object $config the schema configuration object which must contain
-     *   following properties:
-     *   - `ontologyNamespace` - ontology namespace
-     *   - `parent` - RDF property used for denoting the parent relationship
-     *   - `label` - RDF property used for labels
-     *   - `equivalent` (optional, default false) - should class/property
-     *     equivalence be honored while resolving inheritance?
-     *     when requested?
-     *   - `cacheMode` (optional, default Ontology::CACHE_NONE) - caching
-     *     mode. One of:
-     *     - OntologyCache::CACHE_NONE - no caching
-     *     - OntologyCache::CACHE_UPTODATE - cache file modification date must be
-     *       greater than modification time of the ontology repository resource
-     *     - OntologyCache::CACHE_TIMEOUT - cache file must be not older than time
-     *       indicated by the `cacheTimeout` configuration property
-     *   - `cacheFile` (optional, default null) - path to a file storing the
-     *     cache (if null, caching is not used).
-     *   - `cacheTimeout` (optional, default 5) - time in seconds after which
-     *     cache is invalidated.
+     * @param object $schema
      */
-    public function __construct(PDO $pdo, object $config) {
+    public function __construct(PDO $pdo, object $schema) {
         $this->pdo    = $pdo;
-        $this->config = $config;
+        $this->schema = $schema;
 
-        $this->config->equivalent = $this->config->equivalent ?? false;
-
-        $mode    = $this->config->cacheMode ?? OntologyCache::MODE_NONE;
-        $file    = $this->config->cacheFile ?? null;
-        $timeout = $this->config->cacheTimeout ?? 5;
-        $cache   = new OntologyCache($pdo, $mode, $file, $timeout);
-        try {
-            $data = $cache->read();
-            foreach ($data as $k => $v) {
-                $this->$k = $v;
-            }
-            $this->pdo = $pdo;
-        } catch (OntologyCacheException $ex) {
-            $this->loadClasses();
-            $this->loadProperties();
-            $this->loadRestrictions();
-            if ($this->config->cacheMode !== OntologyCache::MODE_NONE) {
-                foreach ($this->distinctProperties as $p) {
-                    $discard = $p->vocabsValues;
-                }
-            }
-            $this->preprocess();
-
-            $this->pdo = null;
-            $cache->save($this);
-            $this->pdo = $pdo;
-        }
+        $this->loadClasses();
+        $this->loadProperties();
+        $this->loadRestrictions();
+        $this->preprocess();
     }
 
     /**
@@ -242,15 +201,14 @@ class Ontology {
             ) t
         ";
         $param = [
-            $this->config->parent, $vocabularyUrl, // WITH
-            $this->config->label, // t1
+            $this->schema->parent, $vocabularyUrl, // WITH
+            $this->schema->label, // t1
             RDF::SKOS_NARROWER, // t2
             RDF::SKOS_BROADER, // t3
         ];
         $query = $this->pdo->prepare($query);
         $query->execute($param);
         $tmp   = json_decode($query->fetchColumn());
-        $tmp   = is_array($tmp) ? $tmp : [];
 
         $concepts = [];
         foreach ($tmp as $i) {
@@ -282,8 +240,7 @@ class Ontology {
     }
 
     private function loadClasses(): void {
-        $equivalent = $this->config->equivalent ? RDF::OWL_EQUIVALENT_CLASS : '';
-        $query      = "
+        $query = "
             WITH RECURSIVE t(pid, id, n) AS (
                 SELECT DISTINCT id, id, 0
                 FROM
@@ -296,7 +253,7 @@ class Ontology {
                 SELECT r.target_id, t.id, t.n + 1
                 FROM
                     relations r 
-                    JOIN t ON t.pid = r.id AND (property = ? OR property = ?) AND n < 30
+                    JOIN t ON t.pid = r.id AND (property = ? OR property = ?)
             ),
             tt AS (
                 SELECT id, json_agg(pid ORDER BY n DESC) AS pids
@@ -329,16 +286,16 @@ class Ontology {
                     GROUP BY 1
                 ) c4 USING (id)
         ";
-        $param      = [
+        $param = [
             RDF::RDF_TYPE, RDF::OWL_CLASS, // with non-recursive
-            RDF::RDFS_SUB_CLASS_OF, $equivalent, // with recursive
+            RDF::RDFS_SUB_CLASS_OF, RDF::OWL_EQUIVALENT_CLASS, // with recursive
             RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c3 (label), c4 (comment)
         ];
-        $query      = $this->pdo->prepare($query);
+        $query = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($c          = $query->fetch(PDO::FETCH_OBJ)) {
+        while ($c     = $query->fetch(PDO::FETCH_OBJ)) {
             $classList = json_decode($c->class);
-            $cc        = new ClassDesc($c, $classList, $this->config->ontologyNamespace);
+            $cc        = new ClassDesc($c, $classList, $this->schema->ontologyNamespace);
             foreach ($classList as $i) {
                 $this->classes[$i] = $cc;
             }
@@ -357,8 +314,7 @@ class Ontology {
     }
 
     private function loadProperties(): void {
-        $equivalent = $this->config->equivalent ? RDF::OWL_EQUIVALENT_PROPERTY : '';
-        $query      = "
+        $query = "
             WITH RECURSIVE t(pid, id, type, n) AS (
                 SELECT DISTINCT id, id, value, 0
                 FROM 
@@ -435,18 +391,18 @@ class Ontology {
                     GROUP BY 1
                 ) c7 USING (id)
         ";
-        $param      = [
+        $param = [
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
-            RDF::RDFS_SUB_PROPERTY_OF, $equivalent, // with recursive term
-            $this->config->parent, RDF::OWL_ANNOTATION_PROPERTY, // ap
+            RDF::RDFS_SUB_PROPERTY_OF, RDF::OWL_EQUIVALENT_PROPERTY, // with recursive term
+            $this->schema->parent, RDF::OWL_ANNOTATION_PROPERTY, // ap
             RDF::RDFS_RANGE, RDF::RDFS_DOMAIN, // c3, c4
             RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c5, c6
         ];
-        $query      = $this->pdo->prepare($query);
+        $query = $this->pdo->prepare($query);
         $query->execute($param);
-        while ($p          = $query->fetch(PDO::FETCH_OBJ)) {
+        while ($p     = $query->fetch(PDO::FETCH_OBJ)) {
             $propList = json_decode($p->property);
-            $prop     = new PropertyDesc($p, $propList, $this->config->ontologyNamespace);
+            $prop     = new PropertyDesc($p, $propList, $this->schema->ontologyNamespace);
             if (!empty($prop->vocabs)) {
                 $prop->setOntology($this);
             }
@@ -483,7 +439,7 @@ class Ontology {
                 LEFT JOIN metadata m4 ON t.id = m4.id AND m4.property = ?
         ";
         $param = [
-            $this->config->parent, RDF::OWL_RESTRICTION, // t
+            $this->schema->parent, RDF::OWL_RESTRICTION, // t
             RDF::OWL_ON_PROPERTY, // c1
             RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY, RDF::OWL_MAX_CARDINALITY, // m2, m3, m4
         ];
