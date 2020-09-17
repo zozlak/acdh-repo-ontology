@@ -120,7 +120,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
 
         $r1 = (new Graph())->resource('.');
         $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p1 = $o->getProperty($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense');
+        $p1 = $o->getProperty($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
         $this->assertEquals(1, $p1->min);
 
         $r2 = (new Graph())->resource('.');
@@ -134,9 +134,9 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     public function testPropertyDomainRange(): void {
         $o = new Ontology(self::$pdo, self::$schema);
         $r = (new Graph())->resource('.');
-        $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasUpdatedDate');
+        $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasAcceptedDate');
         $this->assertContains('http://www.w3.org/2001/XMLSchema#date', $p->range);
-        $this->assertContains('https://vocabs.acdh.oeaw.ac.at/schema#Main', $p->domain);
+        $this->assertContains('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject', $p->domain);
     }
 
     public function testPropertyLabelComment(): void {
