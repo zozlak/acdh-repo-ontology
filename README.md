@@ -12,6 +12,10 @@ An API for the ACDH ontology stored in an ARCHE repository.
 
 `composer require acdh-oeaw/arche-lib-schema`
 
+## Documentation
+
+https://acdh-oeaw.github.io/arche-docs/arche-lib-schema/
+
 ## Usage
 
 ```php
