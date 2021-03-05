@@ -119,7 +119,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $o = new Ontology(self::$pdo, self::$schema);
 
         $r1 = (new Graph())->resource('.');
-        $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#TopCollection');
         $p1 = $o->getProperty($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
         $this->assertEquals(1, $p1->min);
 
