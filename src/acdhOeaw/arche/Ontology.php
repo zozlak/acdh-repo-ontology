@@ -385,8 +385,8 @@ class Ontology {
                         SELECT id, property, type, lang, value
                         FROM metadata a JOIN ap USING (property)
                       UNION
-                        SELECT id, property, 'REL' AS type, null AS lang, target_id::text AS value
-                        FROM relations JOIN ap USING (property)
+                        SELECT r.id, property, 'REL' AS type, null AS lang, ids AS value
+                        FROM relations r JOIN ap USING (property) JOIN identifiers i ON r.target_id = i.id
                     ) a1
                     GROUP BY 1
                 ) c7 USING (id)
