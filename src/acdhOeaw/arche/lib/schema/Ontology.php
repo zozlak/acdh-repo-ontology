@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\arche;
+namespace acdhOeaw\arche\lib\schema;
 
 use PDO;
 use OutOfBoundsException;
@@ -113,7 +113,7 @@ class Ontology {
      * Returns class description.
      * 
      * @param string $class class name URI
-     * @return \acdhOeaw\arche\ClassDesc|null
+     * @return \acdhOeaw\arche\lib\schema\ClassDesc|null
      */
     public function getClass(string $class): ?ClassDesc {
         return $this->classes[$class] ?? null;
@@ -135,7 +135,7 @@ class Ontology {
      * @param $resOrClassesArray \EasyRdf\Resource RDF resource or an array of 
      *   RDF class URIs or an RDF class URI
      * @param string $property property URI
-     * @return \acdhOeaw\arche\PropertyDesc|null
+     * @return \acdhOeaw\arche\lib\schema\PropertyDesc|null
      */
     public function getProperty($resOrClassesArray, string $property): ?PropertyDesc {
         if (empty($resOrClassesArray)) {

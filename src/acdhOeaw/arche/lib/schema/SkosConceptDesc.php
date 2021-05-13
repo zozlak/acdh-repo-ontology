@@ -3,7 +3,7 @@
 /*
  * The MIT License
  *
- * Copyright 2019 Austrian Centre for Digital Humanities.
+ * Copyright 2020 Austrian Centre for Digital Humanities.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,37 +24,18 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\arche;
+namespace acdhOeaw\arche\lib\schema;
 
 /**
- * A container for an OWL restriction description
+ * Container class for a skos:Concept
  *
  * @author zozlak
  */
-class RestrictionDesc extends BaseDesc {
+class SkosConceptDesc extends BaseDesc {
 
-    /**
-     *
-     * @var string[]
-     */
-    public $class = [];
-
-    /**
-     *
-     * @var string
-     */
-    public $onProperty = [];
-
-    /**
-     *
-     * @var int
-     */
-    public $min;
-
-    /**
-     *
-     * @var int
-     */
-    public $max;
+    public $id;
+    public $concept  = [];
+    public $broader  = [];
+    public $narrower = [];
 
 }
