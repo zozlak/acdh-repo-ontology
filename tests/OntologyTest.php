@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\arche\lib\ontology;
+namespace acdhOeaw\arche\lib\schema;
 
 use PDO;
 use EasyRdf\Graph;

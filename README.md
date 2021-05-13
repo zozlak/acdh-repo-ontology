@@ -26,7 +26,7 @@ $cfg = (object) [
     'label'             => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
 ];
 
-$ontology = new \acdhOeaw\arche\lib\ontology\Ontology($conn, $cfg);
+$ontology = new \acdhOeaw\arche\lib\schema\Ontology($conn, $cfg);
 
 $class = $ontology->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Person');
 print_r($class);
