@@ -96,7 +96,7 @@ class PropertyDesc extends BaseDesc {
 
     /**
      * acdh:defaultValue annotation property value
-     * @var bool
+     * @var string
      */
     public $defaultValue;
 
