@@ -38,14 +38,14 @@ class ClassDesc extends BaseDesc {
     /**
      * Class URIs
      * 
-     * @var string[]
+     * @var array<string>
      */
     public $class = [];
 
     /**
      * Array of classes this class inherits from (including the class URI itself)
      * 
-     * @var string[]
+     * @var array<string>
      */
     public $classes = [];
 
@@ -54,7 +54,7 @@ class ClassDesc extends BaseDesc {
      * a property has many URIs, it will exist under all of them - use the
      * `getProperties()` method to get a distinct list of properties).
      * 
-     * @var PropertyDesc[]
+     * @var array<PropertyDesc>
      */
     public $properties = [];
 

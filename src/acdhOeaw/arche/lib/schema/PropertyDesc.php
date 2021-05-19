@@ -36,7 +36,7 @@ class PropertyDesc extends BaseDesc {
     /**
      * Property URIs
      * 
-     * @var string[]
+     * @var array<string>
      */
     public $property = [];
 
@@ -50,21 +50,21 @@ class PropertyDesc extends BaseDesc {
     /**
      * Property domain URI
      * 
-     * @var string
+     * @var array<string>
      */
     public $domain = [];
 
     /**
      * Property URIs of all properties this one inhertis from (includint itself)
      * 
-     * @var string[]
+     * @var array<string>
      */
     public $properties = [];
 
     /**
      * Property range URI
      * 
-     * @var string
+     * @var array<string>
      */
     public $range = [];
 
@@ -84,7 +84,7 @@ class PropertyDesc extends BaseDesc {
 
     /**
      * If a class is among acdh:recommendedClass for this property.
-     * @var bool
+     * @var bool | array<string>
      */
     public $recommendedClass = [];
 
@@ -121,7 +121,7 @@ class PropertyDesc extends BaseDesc {
     /**
      * Array of vocabulary values fetched from vocabulary pointed by acdh:vocabs
      * annotation property
-     * @var SkosConceptDesc[]
+     * @var array<SkosConceptDesc>
      */
     private $vocabsValues;
 
