@@ -113,7 +113,7 @@ class Ontology {
      * Returns class description.
      * 
      * @param string $class class name URI
-     * @return \acdhOeaw\arche\lib\schema\ClassDesc|null
+     * @return ClassDesc|null
      */
     public function getClass(string $class): ?ClassDesc {
         return $this->classes[$class] ?? null;
@@ -135,7 +135,7 @@ class Ontology {
      * @param $resOrClassesArray \EasyRdf\Resource RDF resource or an array of 
      *   RDF class URIs or an RDF class URI
      * @param string $property property URI
-     * @return \acdhOeaw\arche\lib\schema\PropertyDesc|null
+     * @return PropertyDesc|null
      */
     public function getProperty($resOrClassesArray, string $property): ?PropertyDesc {
         if (empty($resOrClassesArray)) {
