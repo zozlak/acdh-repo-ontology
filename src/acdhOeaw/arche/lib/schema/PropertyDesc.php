@@ -38,49 +38,43 @@ class PropertyDesc extends BaseDesc {
      * 
      * @var array<string>
      */
-    public $property = [];
+    public array $property = [];
 
     /**
      * Property type URI (owl:DatatypeProperty or owl:ObjectProperty)
-     * 
-     * @var string
      */
-    public $type;
+    public string $type;
 
     /**
      * Property domain URI
      * 
      * @var array<string>
      */
-    public $domain = [];
+    public array $domain = [];
 
     /**
      * Property URIs of all properties this one inhertis from (includint itself)
      * 
      * @var array<string>
      */
-    public $properties = [];
+    public array $properties = [];
 
     /**
      * Property range URI
      * 
      * @var array<string>
      */
-    public $range = [];
+    public array $range = [];
 
     /**
      * Minimum count
-     * 
-     * @var int
      */
-    public $min;
+    public ?int $min = null;
 
     /**
      * Maximum count
-     * 
-     * @var int
      */
-    public $max;
+    public ?int $max = null;
 
     /**
      * If a class is among acdh:recommendedClass for this property.
@@ -90,62 +84,52 @@ class PropertyDesc extends BaseDesc {
 
     /**
      * achd:automatedFill annotation property value
-     * @var bool
      */
-    public $automatedFill = false;
+    public bool $automatedFill = false;
 
     /**
      * acdh:defaultValue annotation property value
-     * @var string
      */
-    public $defaultValue;
+    public ?string $defaultValue = null;
 
     /**
      * acdh:langTag annotation property value
-     * @var bool
      */
-    public $langTag = false;
+    public bool $langTag = false;
 
     /**
      * achd:ordering annotation property value
-     * @var int
      */
-    public $ordering = 99999;
+    public int $ordering = 99999;
 
     /**
      * acdh:vocabs annotation property value
-     * @var string
      */
-    public $vocabs;
+    public string $vocabs = '';
 
     /**
      * Array of vocabulary values fetched from vocabulary pointed by acdh:vocabs
      * annotation property
      * @var array<SkosConceptDesc>
      */
-    private $vocabsValues;
-
-    /**
-     *
-     * @var Ontology
-     */
-    private $ontologyObj;
+    private array $vocabsValues;
+    private Ontology $ontologyObj;
 
     public function setOntology(Ontology $ontology) {
         $this->ontologyObj = $ontology;
     }
 
     public function __get(string $name) {
-        if ($name === 'vocabsValues' && $this->vocabsValues === null && !empty($this->vocabs)) {
+        if ($name === 'vocabsValues' && !isset($this->vocabsValues) && !empty($this->vocabs)) {
             $this->vocabsValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
         }
         return $this->$name ?? null;
     }
 
-    public function getVocabsValues($lang = 'en'): array {
+    public function getVocabularyValues($lang = 'en'): array {
         $included = [];
         $ret      = [];
-        if ($this->vocabsValues === null && !empty($this->vocabs)) {
+        if (!isset($this->vocabsValues) && !empty($this->vocabs)) {
             $this->vocabsValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
         }
         foreach ($this->vocabsValues ?? [] as $v) {
@@ -159,4 +143,18 @@ class PropertyDesc extends BaseDesc {
         return array_values($ret);
     }
 
+    /**
+     * Checks if a given value exists in a given vocabulary.
+     * 
+     * Returns true if a property doesn't use a controlled vocabulary.
+     * 
+     * @param string $value
+     * @return bool
+     */
+    public function checkVocabularyValue(string $value): bool {
+        if (empty($this->vocabs)) {
+            return true;
+        }
+        return $this->ontologyObj->checkVocabularyValue($this->vocabs, $value);
+    }
 }

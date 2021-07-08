@@ -212,10 +212,10 @@ class Ontology {
 
         $concepts = [];
         foreach ($tmp as $i) {
-            $langs = array_map(function($x) {
+            $langs = array_map(function ($x) {
                 return $x->lang;
             }, $i->label);
-            $labels = array_map(function($x) {
+            $labels = array_map(function ($x) {
                 return $x->value;
             }, $i->label);
             $i->label                        = array_combine($langs, $labels);
@@ -223,10 +223,10 @@ class Ontology {
             $concepts[(string) $concept->id] = $concept;
         }
         foreach ($concepts as $i) {
-            $i->broader = array_map(function($x) use ($concepts) {
+            $i->broader = array_map(function ($x) use ($concepts) {
                 return $concepts[(string) $x];
             }, $i->broader);
-            $i->narrower = array_map(function($x) use ($concepts) {
+            $i->narrower = array_map(function ($x) use ($concepts) {
                 return $concepts[(string) $x];
             }, $i->narrower);
         }
@@ -237,6 +237,30 @@ class Ontology {
             }
         }
         return $result;
+    }
+
+    /**
+     * Checks if a given value exists in a given vocabulary.
+     * 
+     * @param string $vocabularyUrl
+     * @param string $value
+     * @return bool
+     */
+    public function checkVocabularyValue(string $vocabularyUrl, string $value): bool {
+        $query = "
+            SELECT count(*)
+            FROM
+                identifiers i1
+                JOIN relations r USING (id)
+                JOIN identifiers i2 ON r.target_id = i2.id AND r.property = ?
+            WHERE
+                i1.ids = ?
+                AND i2.ids = ?
+        ";
+        $param = [$this->schema->parent, $value, $vocabularyUrl];
+        $query = $this->pdo->prepare($query);
+        $query->execute($param);
+        return $query->fetchColumn() > 0;
     }
 
     private function loadClasses(): void {
@@ -517,5 +541,4 @@ class Ontology {
             }
         }
     }
-
 }

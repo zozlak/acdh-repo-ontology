@@ -99,8 +99,8 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $p = $c->getProperties();
         $this->assertEquals(count(array_unique(array_map('spl_object_id', $p))), count($p));
         $this->assertEquals(count(array_unique(array_map('spl_object_id', $c->properties))), count($p));
-    }    
-    
+    }
+
     public function testCardinalitiesIndirect(): void {
         $o = new Ontology(self::$pdo, self::$schema);
 
@@ -174,12 +174,23 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testPropertyGetVocabsValues(): void {
+        $o  = new Ontology(self::$pdo, self::$schema);
+        $c  = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $p  = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+        $vv = $p->getVocabularyValues();
+        $this->assertEquals(count(array_unique(array_map('spl_object_id', $vv))), count($vv));
+        $this->assertEquals(count(array_unique(array_map('spl_object_id', $p->vocabsValues))), count($vv));
+    }
+
+    public function testPropertyVocabsValue(): void {
         $o = new Ontology(self::$pdo, self::$schema);
         $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
         $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $vv = $p->getVocabsValues();
-        $this->assertEquals(count(array_unique(array_map('spl_object_id', $vv))), count($vv));
-        $this->assertEquals(count(array_unique(array_map('spl_object_id', $p->vocabsValues))), count($vv));
+        $this->assertTrue($p->checkVocabularyValue('https://vocabs.acdh.oeaw.ac.at/archelicenses/publicdomain-1-0'));
+        $this->assertFalse($p->checkVocabularyValue('foo'));
+
+        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
+        $this->assertTrue($p->checkVocabularyValue('foo'));
     }
 
     public function testPropertyByClassUri(): void {
@@ -193,5 +204,4 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $p = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
         $this->assertEquals('Contact(s)', $p->label['en']);
     }
-
 }
