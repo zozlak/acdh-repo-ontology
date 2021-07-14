@@ -71,7 +71,12 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertArrayHasKey('en', $c->label);
         $this->assertArrayHasKey('de', $c->label);
         $this->assertArrayHasKey('en', $c->comment);
+        $this->assertArrayHasKey('de', $c->comment);
         $this->assertEquals('Collection', $c->label['en']);
+        $this->assertEquals($c->label['en'], $c->getLabel('en'));
+        $this->assertEquals($c->label['de'], $c->getLabel('de'));
+        $this->assertEquals($c->comment['en'], $c->getComment('en'));
+        $this->assertEquals($c->comment['de'], $c->getComment('de'));
     }
 
     public function testClassInheritance(): void {
@@ -163,34 +168,48 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/rest/v1/arche_licenses/data', $p->vocabs);
     }
 
-    public function testPropertyVocabsValues(): void {
+    public function testPropertyVocabularyValues(): void {
         $o = new Ontology(self::$pdo, self::$schema);
         $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
         $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0', $p->vocabsValues);
-        $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'));
-        $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'));
-        $this->assertEquals('Namensnennung 4.0 International (CC BY 4.0)', $p->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'de'));
+        $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0', $p->vocabularyValues);
+        $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'));
+        $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'));
+        $this->assertEquals('Namensnennung 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'de'));
     }
 
-    public function testPropertyGetVocabsValues(): void {
+    public function testPropertyGetVocabularyValues(): void {
         $o  = new Ontology(self::$pdo, self::$schema);
         $c  = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
         $p  = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
         $vv = $p->getVocabularyValues();
         $this->assertEquals(count(array_unique(array_map('spl_object_id', $vv))), count($vv));
-        $this->assertEquals(count(array_unique(array_map('spl_object_id', $p->vocabsValues))), count($vv));
+        $this->assertEquals(count(array_unique(array_map('spl_object_id', $p->vocabularyValues))), count($vv));
     }
 
-    public function testPropertyVocabsValue(): void {
+    public function testPropertyCheckVocabularyValue(): void {
         $o = new Ontology(self::$pdo, self::$schema);
         $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
         $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $this->assertTrue($p->checkVocabularyValue('https://vocabs.acdh.oeaw.ac.at/archelicenses/publicdomain-1-0'));
-        $this->assertFalse($p->checkVocabularyValue('foo'));
+        $this->assertIsString($p->checkVocabularyValue('https://vocabs.acdh.oeaw.ac.at/archelicenses/publicdomain-1-0'));
+        $this->assertFalse($p->checkVocabularyValue('Public Domain Mark 1.0'));
+        $this->assertIsString($p->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
+        $this->assertFalse($p->checkVocabularyValue('foo', Ontology::VOCABSVALUE_ALL));
 
         $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
         $this->assertTrue($p->checkVocabularyValue('foo'));
+    }
+
+    public function testPropertyGetVocabularyValue(): void {
+        $o = new Ontology(self::$pdo, self::$schema);
+        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+        $v = $p->getVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL);
+        $this->assertInstanceOf(SkosConceptDesc::class, $v);
+        $this->assertNull($p->getVocabularyValue('foo'));
+        
+        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
+        $this->assertNull($p->getVocabularyValue('foo'));
     }
 
     public function testPropertyByClassUri(): void {

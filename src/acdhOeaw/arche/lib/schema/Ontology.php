@@ -40,6 +40,17 @@ use zozlak\RdfConstants as RDF;
  */
 class Ontology {
 
+    const VOCABSVALUE_ID        = 1;
+    const VOCABSVALUE_NOTATION  = 2;
+    const VOCABSVALUE_PREFLABEL = 4;
+    const VOCABSVALUE_ALTLABEL  = 8;
+    const VOCABSVALUE_ALL       = 255;
+
+    static private $vocabsValueProperties = [
+        RDF::SKOS_NOTATION   => self::VOCABSVALUE_NOTATION,
+        RDF::SKOS_PREF_LABEL => self::VOCABSVALUE_PREFLABEL,
+        RDF::SKOS_ALT_LABEL  => self::VOCABSVALUE_ALTLABEL,
+    ];
     private $pdo;
     private $schema;
 
@@ -155,88 +166,43 @@ class Ontology {
     }
 
     /**
-     * Fetches an array of SkosConceptDesc objects desribing allowed vocabulary
-     * values.
+     * Fetches an array of SkosConceptDesc objects desribing vocabulary values.
      * 
      * @param string $vocabularyUrl
-     * @return SkosConceptDesc[]
+     * @return array<SkosConceptDesc>
      */
     public function getVocabularyValues(string $vocabularyUrl): array {
         $query = "
-            WITH c AS (
-                SELECT r.id
-                FROM
-                    identifiers i
-                    JOIN relations r ON r.target_id = i.id AND r.property = ?
-                WHERE ids = ?
-            )
-            SELECT json_agg(row_to_json(t))
-            FROM (
-                SELECT *
-                FROM
-                    c
-                    JOIN (
-                        SELECT id, json_agg(ids) AS concept
-                        FROM identifiers
-                        GROUP BY 1
-                    ) t0 USING (id)
-                    JOIN (
-                        SELECT id, json_agg(json_build_object('lang', lang, 'value', value)) AS label
-                        FROM metadata
-                        WHERE property = ?
-                        GROUP BY 1
-                    ) t1 USING (id)
-                    LEFT JOIN (
-                        SELECT id, json_agg(target_id) AS narrower
-                        FROM relations
-                        WHERE property = ?
-                        GROUP BY 1
-                    ) t2 USING (id)
-                    LEFT JOIN (
-                        SELECT id, json_agg(target_id) AS broader
-                        FROM relations
-                        WHERE property = ?
-                        GROUP BY 1
-                    ) t3 USING (id)
-            ) t
+            SELECT r.id
+            FROM
+                identifiers i
+                JOIN relations r ON r.target_id = i.id AND r.property = ?
+            WHERE ids = ?
         ";
-        $param = [
-            $this->schema->parent, $vocabularyUrl, // WITH
-            $this->schema->label, // t1
-            RDF::SKOS_NARROWER, // t2
-            RDF::SKOS_BROADER, // t3
-        ];
-        $query = $this->pdo->prepare($query);
-        $query->execute($param);
-        $tmp   = json_decode($query->fetchColumn());
+        $param = [RDF::SKOS_IN_SCHEME, $vocabularyUrl];
+        return $this->fetchVocabularyValues($query, $param);
+    }
 
-        $concepts = [];
-        foreach ($tmp as $i) {
-            $langs = array_map(function ($x) {
-                return $x->lang;
-            }, $i->label);
-            $labels = array_map(function ($x) {
-                return $x->value;
-            }, $i->label);
-            $i->label                        = array_combine($langs, $labels);
-            $concept                         = new SkosConceptDesc($i);
-            $concepts[(string) $concept->id] = $concept;
+    /**
+     * Fetches SkosConceptDesc object desribing a vocabulary value.
+     * 
+     * @param string $vocabularyUrl
+     * @param string $value
+     * @param int $searchIn combination of Ontology::VOCABSVALUE_* flags indicating
+     *   where to search for the $value (in a concept URI/ID, skos:notation, 
+     *   skos:prefLabel, etc.)
+     * @return ?SkosConceptDesc
+     */
+    public function getVocabularyValue(string $vocabularyUrl, string $value,
+                                       int $searchIn = self::VOCABSVALUE_ID): ?SkosConceptDesc {
+        $id    = $this->checkVocabularyValue($vocabularyUrl, $value, $searchIn);
+        if ($id === false) {
+            return null;
         }
-        foreach ($concepts as $i) {
-            $i->broader = array_map(function ($x) use ($concepts) {
-                return $concepts[(string) $x];
-            }, $i->broader);
-            $i->narrower = array_map(function ($x) use ($concepts) {
-                return $concepts[(string) $x];
-            }, $i->narrower);
-        }
-        $result = [];
-        foreach ($concepts as $c) {
-            foreach ($c->concept as $i) {
-                $result[$i] = $c;
-            }
-        }
-        return $result;
+        $query = "SELECT id FROM identifiers WHERE ids = ?";
+        $param = [$id];
+        $value = $this->fetchVocabularyValues($query, $param);
+        return array_pop($value);
     }
 
     /**
@@ -244,23 +210,61 @@ class Ontology {
      * 
      * @param string $vocabularyUrl
      * @param string $value
-     * @return bool
+     * @param int $searchIn combination of Ontology::VOCABSVALUE_* flags indicating
+     *   where to search for the $value (in a concept URI/ID, skos:notation, 
+     *   skos:prefLabel, etc.)
+     * @return string|false a vocabulary value identifier or false if $value is invalid
      */
-    public function checkVocabularyValue(string $vocabularyUrl, string $value): bool {
+    public function checkVocabularyValue(string $vocabularyUrl, string $value,
+                                         int $searchIn = self::VOCABSVALUE_ID): string | false {
+        if ($searchIn & self::VOCABSVALUE_ID) {
+            $query = "
+                SELECT count(*)
+                FROM
+                    identifiers i1
+                    JOIN relations r USING (id)
+                    JOIN identifiers i2 ON r.target_id = i2.id
+                WHERE
+                    i1.ids = ?
+                    AND i2.ids = ?
+                    AND r.property = ?
+            ";
+            $param = [$value, $vocabularyUrl, RDF::SKOS_IN_SCHEME];
+            $query = $this->pdo->prepare($query);
+            $query->execute($param);
+            if ($query->fetchColumn() > 0) {
+                return $value;
+            }
+        }
+        if ($searchIn <= self::VOCABSVALUE_ID) {
+            return false;
+        }
+
         $query = "
-            SELECT count(*)
+            SELECT i1.id, (array_agg(i1.ids))[1] AS ids
             FROM
                 identifiers i1
+                JOIN metadata m USING (id)
                 JOIN relations r USING (id)
-                JOIN identifiers i2 ON r.target_id = i2.id AND r.property = ?
+                JOIN identifiers i2 ON r.target_id = i2.id
             WHERE
-                i1.ids = ?
+                substring(m.value, 1, 1000) = ?
+                AND m.property = ?
                 AND i2.ids = ?
+                AND r.property = ?
+            GROUP BY 1
         ";
-        $param = [$this->schema->parent, $value, $vocabularyUrl];
         $query = $this->pdo->prepare($query);
-        $query->execute($param);
-        return $query->fetchColumn() > 0;
+        foreach (self::$vocabsValueProperties as $prop => $mask) {
+            if ($searchIn & $mask) {
+                $query->execute([$value, $prop, $vocabularyUrl, RDF::SKOS_IN_SCHEME]);
+                $results = $query->fetchAll(PDO::FETCH_OBJ);
+                if (count($results) === 1) {
+                    return $results[0]->ids;
+                }
+            }
+        }
+        return false;
     }
 
     private function loadClasses(): void {
@@ -540,5 +544,92 @@ class Ontology {
                 }
             }
         }
+    }
+
+    /**
+     * Fetches information about SKOS concepts and formats them as SkosConceptDesc
+     * objects.
+     * 
+     * @param string $valuesQuery
+     * @param array $valuesParam
+     * @return array<SkosConceptDesc>
+     */
+    private function fetchVocabularyValues(string $valuesQuery,
+                                           array $valuesParam): array {
+        $query = "
+            WITH c AS ($valuesQuery)
+            SELECT json_agg(row_to_json(t))
+            FROM (
+                SELECT *
+                FROM
+                    c
+                    JOIN (
+                        SELECT id, json_agg(ids) AS concept
+                        FROM identifiers
+                        GROUP BY 1
+                    ) t0 USING (id)
+                    LEFT JOIN (
+                        SELECT id, json_agg(value) AS notation
+                        FROM metadata
+                        WHERE property = ?
+                        GROUP BY 1
+                    ) t1 USING (id)
+                    JOIN (
+                        SELECT id, json_agg(json_build_object('lang', lang, 'value', value)) AS label
+                        FROM metadata
+                        WHERE property = ?
+                        GROUP BY 1
+                    ) t2 USING (id)
+                    LEFT JOIN (
+                        SELECT id, json_agg(target_id) AS narrower
+                        FROM relations
+                        WHERE property = ?
+                        GROUP BY 1
+                    ) t3 USING (id)
+                    LEFT JOIN (
+                        SELECT id, json_agg(target_id) AS broader
+                        FROM relations
+                        WHERE property = ?
+                        GROUP BY 1
+                    ) t4 USING (id)
+            ) t
+        ";
+        $param = [
+            RDF::SKOS_NOTATION,
+            $this->schema->label, // t2
+            RDF::SKOS_NARROWER, // t3
+            RDF::SKOS_BROADER, // t4
+        ];
+        $query = $this->pdo->prepare($query);
+        $query->execute(array_merge($valuesParam, $param));
+        $tmp   = json_decode($query->fetchColumn());
+
+        $concepts = [];
+        foreach ($tmp as $i) {
+            $langs = array_map(function ($x) {
+                return $x->lang;
+            }, $i->label);
+            $labels = array_map(function ($x) {
+                return $x->value;
+            }, $i->label);
+            $i->label                        = array_combine($langs, $labels);
+            $concept                         = new SkosConceptDesc($i);
+            $concepts[(string) $concept->id] = $concept;
+        }
+        foreach ($concepts as $i) {
+            $i->broader = array_map(function ($x) use ($concepts) {
+                return $concepts[(string) $x];
+            }, $i->broader);
+            $i->narrower = array_map(function ($x) use ($concepts) {
+                return $concepts[(string) $x];
+            }, $i->narrower);
+        }
+        $result = [];
+        foreach ($concepts as $c) {
+            foreach ($c->concept as $i) {
+                $result[$i] = $c;
+            }
+        }
+        return $result;
     }
 }

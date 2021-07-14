@@ -112,7 +112,7 @@ class PropertyDesc extends BaseDesc {
      * annotation property
      * @var array<SkosConceptDesc>
      */
-    private array $vocabsValues;
+    private array $vocabularyValues;
     private Ontology $ontologyObj;
 
     public function setOntology(Ontology $ontology) {
@@ -120,19 +120,26 @@ class PropertyDesc extends BaseDesc {
     }
 
     public function __get(string $name) {
-        if ($name === 'vocabsValues' && !isset($this->vocabsValues) && !empty($this->vocabs)) {
-            $this->vocabsValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
+        if ($name === 'vocabularyValues' && !isset($this->vocabularyValues) && !empty($this->vocabs)) {
+            $this->vocabularyValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
         }
         return $this->$name ?? null;
     }
 
+    /**
+     * Returns a list of vocabulary values sorted according to the label
+     * property value in a given language.
+     * 
+     * @param type $lang
+     * @return array
+     */
     public function getVocabularyValues($lang = 'en'): array {
         $included = [];
         $ret      = [];
-        if (!isset($this->vocabsValues) && !empty($this->vocabs)) {
-            $this->vocabsValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
+        if (!isset($this->vocabularyValues) && !empty($this->vocabs)) {
+            $this->vocabularyValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
         }
-        foreach ($this->vocabsValues ?? [] as $v) {
+        foreach ($this->vocabularyValues ?? [] as $v) {
             $hash = spl_object_hash($v);
             if (!isset($included[$hash])) {
                 $ret[$v->getLabel($lang)] = $v;
@@ -144,17 +151,37 @@ class PropertyDesc extends BaseDesc {
     }
 
     /**
-     * Checks if a given value exists in a given vocabulary.
-     * 
-     * Returns true if a property doesn't use a controlled vocabulary.
+     * Fetches SkosConceptDesc object desribing a vocabulary value.
      * 
      * @param string $value
-     * @return bool
+     * @param int $searchIn combination of Ontology::VOCABSVALUE_* flags indicating
+     *   where to search for the $value (in a concept URI/ID, skos:notation, 
+     *   skos:prefLabel, etc.)
+     * @return ?SkosConceptDesc
      */
-    public function checkVocabularyValue(string $value): bool {
+    public function getVocabularyValue(string $value,
+                                       int $searchIn = Ontology::VOCABSVALUE_ID): ?SkosConceptDesc {
+        if (empty($this->vocabs)) {
+            return null;
+        }
+        return $this->ontologyObj->getVocabularyValue($this->vocabs, $value, $searchIn);
+    }
+
+    /**
+     * Checks if a given value exists in a given vocabulary.
+     * 
+     * @param string $value
+     * @param int $searchIn combination of Ontology::VOCABSVALUE_* flags indicating
+     *   where to search for the $value (in a concept URI/ID, skos:notation, 
+     *   skos:prefLabel, etc.)
+     * @return string|bool a vocabulary value identifier, `false` if $value is invalid
+     *   or `true` when property doesn't use a controlled vocabulary
+     */
+    public function checkVocabularyValue(string $value,
+                                         int $searchIn = Ontology::VOCABSVALUE_ID): string | bool {
         if (empty($this->vocabs)) {
             return true;
         }
-        return $this->ontologyObj->checkVocabularyValue($this->vocabs, $value);
+        return $this->ontologyObj->checkVocabularyValue($this->vocabs, $value, $searchIn);
     }
 }

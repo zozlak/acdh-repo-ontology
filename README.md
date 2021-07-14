@@ -37,8 +37,10 @@ print_r($property);
 $property = $ontology->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
 print_r($property);
 
+// controlled vocabulary on a property
 $property = $ontology->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense');
-print_r($property->vocabsValues);
-echo $property->vocabsValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('de');
-
+echo $property->checkVocabularyValue('cc-by-4-0', \acdhOeaw\arche\lib\schema\Ontology::VOCABSVALUE_ALL); // doesn't fetch  all vocabulary values
+print_r($property->getVocabularyValue('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0')); // doesn't fetch  all vocabulary values
+print_r($property->vocabularyValues); // fetches all values
+echo $property->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('de'); // fetches all values first if they aren't loaded yet
 ```

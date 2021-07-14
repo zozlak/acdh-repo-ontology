@@ -35,6 +35,7 @@ class SkosConceptDesc extends BaseDesc {
 
     public $id;
     public $concept  = [];
+    public $notation = [];
     public $broader  = [];
     public $narrower = [];
 
