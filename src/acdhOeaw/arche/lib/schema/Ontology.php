@@ -46,13 +46,17 @@ class Ontology {
     const VOCABSVALUE_ALTLABEL  = 8;
     const VOCABSVALUE_ALL       = 255;
 
-    static private $vocabsValueProperties = [
+    /**
+     * 
+     * @var array<string, int>
+     */
+    static private array $vocabsValueProperties = [
         RDF::SKOS_NOTATION   => self::VOCABSVALUE_NOTATION,
         RDF::SKOS_PREF_LABEL => self::VOCABSVALUE_PREFLABEL,
         RDF::SKOS_ALT_LABEL  => self::VOCABSVALUE_ALTLABEL,
     ];
-    private $pdo;
-    private $schema;
+    private PDO $pdo;
+    private object $schema;
 
     /**
      *
@@ -62,25 +66,25 @@ class Ontology {
 
     /**
      *
-     * @var ClassDesc[]
+     * @var array<string, array<ClassDesc>>
      */
     private $classesRev = [];
 
     /**
      *
-     * @var PropertyDesc[]
+     * @var array<string, PropertyDesc>
      */
     private $properties = [];
 
     /**
      *
-     * @var PropertyDesc[]
+     * @var array<string, PropertyDesc>
      */
     private $distinctProperties = [];
 
     /**
      *
-     * @var RestrictionDesc[]
+     * @var array<string, RestrictionDesc>
      */
     private $restrictions = [];
 
@@ -143,12 +147,13 @@ class Ontology {
      * and a first encounterred match is returned (property cardinality and 
      * range may vary between classes).
      * 
-     * @param $resOrClassesArray \EasyRdf\Resource RDF resource or an array of 
-     *   RDF class URIs or an RDF class URI
+     * @param Resource | array<string> | string | null $resOrClassesArray an RDF resource or an 
+     *   array of RDF class URIs or an RDF class URI
      * @param string $property property URI
      * @return PropertyDesc|null
      */
-    public function getProperty($resOrClassesArray, string $property): ?PropertyDesc {
+    public function getProperty(Resource | array | string | null $resOrClassesArray,
+                                string $property): ?PropertyDesc {
         if (empty($resOrClassesArray)) {
             $resOrClassesArray = [];
         } elseif ($resOrClassesArray instanceof Resource) {
@@ -195,7 +200,7 @@ class Ontology {
      */
     public function getVocabularyValue(string $vocabularyUrl, string $value,
                                        int $searchIn = self::VOCABSVALUE_ID): ?SkosConceptDesc {
-        $id    = $this->checkVocabularyValue($vocabularyUrl, $value, $searchIn);
+        $id = $this->checkVocabularyValue($vocabularyUrl, $value, $searchIn);
         if ($id === false) {
             return null;
         }
@@ -488,15 +493,6 @@ class Ontology {
      * @return void
      */
     private function preprocess(): void {
-        // inherit property range
-        foreach ($this->properties as $p) {
-            for ($i = 1; empty($this->range) && $i < count($p->properties); $i++) {
-                if (isset($this->properties[$p->properties[$i]])) {
-                    $this->property = $this->properties[$p->properties[$i]]->range;
-                }
-            }
-        }
-
         // assign properties to classes
         $classes = array_keys($this->classes);
         foreach ($this->distinctProperties as $p) {
@@ -551,7 +547,7 @@ class Ontology {
      * objects.
      * 
      * @param string $valuesQuery
-     * @param array $valuesParam
+     * @param array<mixed> $valuesParam
      * @return array<SkosConceptDesc>
      */
     private function fetchVocabularyValues(string $valuesQuery,

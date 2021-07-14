@@ -64,7 +64,7 @@ class BaseDesc {
     /**
      * 
      * @param object $d
-     * @param array $ids
+     * @param array<string> $ids
      * @param string $nmsp
      */
     public function __construct(object $d = null, array $ids = [], string $nmsp = null) {
@@ -80,7 +80,7 @@ class BaseDesc {
         }
         
         if ($d !== null) {
-            foreach ($this as $k => $v) {
+            foreach ((array) $this as $k => $v) {
                 $dk = strtolower($k);
                 if (isset($d->$dk)) {
                     if (is_array($this->$k) && !is_array($d->$dk)) {

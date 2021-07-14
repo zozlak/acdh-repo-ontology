@@ -34,9 +34,25 @@ namespace acdhOeaw\arche\lib\schema;
 class SkosConceptDesc extends BaseDesc {
 
     public $id;
-    public $concept  = [];
-    public $notation = [];
-    public $broader  = [];
-    public $narrower = [];
+    /**
+     * 
+     * @var array<string, string>
+     */
+    public array $concept  = [];
+    /**
+     * 
+     * @var array<string>
+     */
+    public array $notation = [];
+    /**
+     * 
+     * @var array<SkosConceptDesc>
+     */
+    public array $broader  = [];
+    /**
+     * 
+     * @var array<SkosConceptDesc>
+     */
+    public array $narrower = [];
 
 }

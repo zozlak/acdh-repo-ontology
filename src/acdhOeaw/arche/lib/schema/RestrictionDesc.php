@@ -35,26 +35,15 @@ class RestrictionDesc extends BaseDesc {
 
     /**
      *
-     * @var string[]
+     * @var array<string>
      */
-    public $class = [];
+    public array $class = [];
 
     /**
      *
-     * @var string
+     * @var array<string>
      */
-    public $onProperty = [];
-
-    /**
-     *
-     * @var int
-     */
-    public $min;
-
-    /**
-     *
-     * @var int
-     */
-    public $max;
-
+    public array $onProperty = [];
+    public ?int $min = null;
+    public ?int $max = null;
 }

@@ -115,11 +115,11 @@ class PropertyDesc extends BaseDesc {
     private array $vocabularyValues;
     private Ontology $ontologyObj;
 
-    public function setOntology(Ontology $ontology) {
+    public function setOntology(Ontology $ontology): void {
         $this->ontologyObj = $ontology;
     }
 
-    public function __get(string $name) {
+    public function __get(string $name): mixed {
         if ($name === 'vocabularyValues' && !isset($this->vocabularyValues) && !empty($this->vocabs)) {
             $this->vocabularyValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
         }
@@ -130,10 +130,10 @@ class PropertyDesc extends BaseDesc {
      * Returns a list of vocabulary values sorted according to the label
      * property value in a given language.
      * 
-     * @param type $lang
-     * @return array
+     * @param string $lang
+     * @return array<SkosConceptDesc>
      */
-    public function getVocabularyValues($lang = 'en'): array {
+    public function getVocabularyValues(string $lang = 'en'): array {
         $included = [];
         $ret      = [];
         if (!isset($this->vocabularyValues) && !empty($this->vocabs)) {
