@@ -609,7 +609,7 @@ class Ontology {
                 return $x->value;
             }, $i->label);
             $i->label                        = array_combine($langs, $labels);
-            $concept                         = new SkosConceptDesc($i);
+            $concept                         = new SkosConceptDesc($i, $i->concept, $this->schema->ontologyNamespace);
             $concepts[(string) $concept->id] = $concept;
         }
         foreach ($concepts as $i) {
