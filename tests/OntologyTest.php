@@ -27,6 +27,8 @@
 namespace acdhOeaw\arche\lib\schema;
 
 use PDO;
+use ReflectionClass;
+use ReflectionProperty;
 use EasyRdf\Graph;
 use zozlak\RdfConstants as RDF;
 
@@ -104,6 +106,19 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $p = $c->getProperties();
         $this->assertEquals(count(array_unique(array_map('spl_object_id', $p))), count($p));
         $this->assertEquals(count(array_unique(array_map('spl_object_id', $c->properties))), count($p));
+    }
+
+    public function testPropertyPropertiesInitialized(): void {
+        $o  = new Ontology(self::$pdo, self::$schema);
+        $p  = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense');
+        $rc = new ReflectionClass($p);
+        foreach ($rc->getProperties(ReflectionProperty::IS_PUBLIC) as $i) {
+            $rp = new ReflectionProperty($p, $i->name);
+            $rt = $rp->getType();
+            if ($rt !== null && !$rt->allowsNull()) {
+                $this->assertTrue(isset($p->{$i->name}), "propertyDesc->" . $i->name . " is not initialized");
+            }
+        }
     }
 
     public function testCardinalitiesIndirect(): void {
@@ -207,7 +222,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $v = $p->getVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL);
         $this->assertInstanceOf(SkosConceptDesc::class, $v);
         $this->assertNull($p->getVocabularyValue('foo'));
-        
+
         $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
         $this->assertNull($p->getVocabularyValue('foo'));
     }

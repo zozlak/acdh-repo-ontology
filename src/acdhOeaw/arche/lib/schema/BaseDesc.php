@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\arche\lib\schema;
 
+use ReflectionClass;
+
 /**
  * Description of BaseDesc
  *
@@ -39,14 +41,14 @@ class BaseDesc {
      * @var int
      */
     public $id;
-    
+
     /**
      * The ontology entity URI within the ontology namespace
      * 
      * @var string
      */
     public $uri;
-    
+
     /**
      * Associative array of label values (langauge as a key)
      * 
@@ -67,9 +69,10 @@ class BaseDesc {
      * @param array<string> $ids
      * @param string $nmsp
      */
-    public function __construct(object $d = null, array $ids = [], string $nmsp = null) {
+    public function __construct(object $d = null, array $ids = [],
+                                string $nmsp = null) {
         $nmspL = strlen($nmsp);
-        foreach ($ids as $i){
+        foreach ($ids as $i) {
             if ($nmspL > 0 && substr($i, 0, $nmspL) === $nmsp) {
                 $this->uri = $i;
                 break;
@@ -78,12 +81,14 @@ class BaseDesc {
         if (empty($this->uri)) {
             $this->uri = $ids[0] ?? null;
         }
-        
+
         if ($d !== null) {
-            foreach ((array) $this as $k => $v) {
+            $rc = new ReflectionClass(static::class);
+            foreach ($rc->getProperties() as $k) {
+                $k = $k->name;
                 $dk = strtolower($k);
                 if (isset($d->$dk)) {
-                    if (is_array($this->$k) && !is_array($d->$dk)) {
+                    if (is_array($this->$k ?? null) && !is_array($d->$dk)) {
                         $this->$k = json_decode($d->$dk, true);
                     } else {
                         $this->$k = $d->$dk;
@@ -121,5 +126,4 @@ class BaseDesc {
                                    string $fallbackLang): string {
         return $this->{$property}[$lang] ?? ($this->{$property}[$fallbackLang] ?? (reset($this->$property) ?? ''));
     }
-
 }

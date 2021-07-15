@@ -78,9 +78,12 @@ class PropertyDesc extends BaseDesc {
 
     /**
      * If a class is among acdh:recommendedClass for this property.
+     * 
+     * After initialization the value is always a boolean one.
+     * 
      * @var bool | array<string>
      */
-    public $recommendedClass = [];
+    public bool | array $recommendedClass = [];
 
     /**
      * achd:automatedFill annotation property value
@@ -110,7 +113,10 @@ class PropertyDesc extends BaseDesc {
     /**
      * Array of vocabulary values fetched from vocabulary pointed by acdh:vocabs
      * annotation property
-     * @var array<SkosConceptDesc>
+     * 
+     * It's initialized automatically upon the first read.
+     * 
+     * @var array<SkosConceptDesc> | null
      */
     private array $vocabularyValues;
     private Ontology $ontologyObj;
