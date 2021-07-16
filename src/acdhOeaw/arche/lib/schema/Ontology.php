@@ -281,7 +281,7 @@ class Ontology {
                     JOIN metadata USING (id)
                 WHERE
                     property = ?
-                    AND value = ?
+                    AND substring(value, 1, 1000) = ?
               UNION
                 SELECT r.target_id, t.id, t.n + 1
                 FROM
@@ -347,6 +347,24 @@ class Ontology {
     }
 
     private function loadProperties(): void {
+        // much faster as it allows "property IN ()" clause in the next query
+        $query  = "
+            SELECT i1.ids
+            FROM
+                identifiers i1
+                JOIN relations r USING (id)
+                JOIN identifiers i2 ON r.target_id = i2.id
+            WHERE
+                r.property = ?
+                AND i2.ids = ?
+        ";
+        $param       = [$this->schema->parent, RDF::OWL_ANNOTATION_PROPERTY];
+        $query       = $this->pdo->prepare($query);
+        $query->execute($param);
+        $anPropParam = $query->fetchAll(PDO::FETCH_COLUMN);
+        $anPropParam = count($anPropParam) > 0 ? $anPropParam : [''];
+        $anPropSql   = substr(str_repeat('?, ', count($anPropParam)), 0, -2);
+
         $query = "
             WITH RECURSIVE t(pid, id, type, n) AS (
                 SELECT DISTINCT id, id, value, 0
@@ -366,16 +384,6 @@ class Ontology {
                 SELECT id, type, json_agg(pid ORDER BY n DESC) AS pids
                 FROM t
                 GROUP BY 1, 2
-            ),
-            ap AS (
-                SELECT i1.ids AS property
-                FROM
-                    identifiers i1
-                    JOIN relations r USING (id)
-                    JOIN identifiers i2 ON r.target_id = i2.id
-                WHERE
-                    r.property = ?
-                    AND i2.ids = ? 
             )
             SELECT tt.id, tt.pids, tt.type, property, properties, range, domain, label, comment, annotations
             FROM
@@ -416,10 +424,12 @@ class Ontology {
                     SELECT a1.id, json_agg(row_to_json(a1.*)) AS annotations
                     FROM (
                         SELECT id, property, type, lang, value
-                        FROM metadata a JOIN ap USING (property)
+                        FROM metadata a
+                        WHERE property IN ($anPropSql)
                       UNION
                         SELECT r.id, property, 'REL' AS type, null AS lang, ids AS value
-                        FROM relations r JOIN ap USING (property) JOIN identifiers i ON r.target_id = i.id
+                        FROM relations r JOIN identifiers i ON r.target_id = i.id
+                        WHERE property IN ($anPropSql)
                     ) a1
                     GROUP BY 1
                 ) c7 USING (id)
@@ -427,10 +437,10 @@ class Ontology {
         $param = [
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
             RDF::RDFS_SUB_PROPERTY_OF, RDF::OWL_EQUIVALENT_PROPERTY, // with recursive term
-            $this->schema->parent, RDF::OWL_ANNOTATION_PROPERTY, // ap
             RDF::RDFS_RANGE, RDF::RDFS_DOMAIN, // c3, c4
             RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c5, c6
         ];
+        $param = array_merge($param, $anPropParam, $anPropParam);
         $query = $this->pdo->prepare($query);
         $query->execute($param);
         while ($p     = $query->fetch(PDO::FETCH_OBJ)) {
@@ -609,7 +619,7 @@ class Ontology {
                 return $x->value;
             }, $i->label);
             $i->label                        = array_combine($langs, $labels);
-            $concept                         = new SkosConceptDesc($i, $i->concept, $this->schema->ontologyNamespace);
+            $concept                         = new SkosConceptDesc($i);
             $concepts[(string) $concept->id] = $concept;
         }
         foreach ($concepts as $i) {
