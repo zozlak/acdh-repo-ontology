@@ -450,7 +450,7 @@ class Ontology {
                 $prop->setOntology($this);
             }
             foreach ($propList as $i) {
-                $this->properties[$i] = $prop;
+                $this->properties[(string) $i] = $prop;
             }
             $this->properties[(string) $p->id]         = $prop;
             $this->distinctProperties[(string) $p->id] = $prop;
@@ -492,7 +492,7 @@ class Ontology {
             $classList = json_decode($r->class);
             $rr        = new RestrictionDesc($r);
             foreach ($classList as $i) {
-                $this->restrictions[$i] = $rr;
+                $this->restrictions[(string) $i] = $rr;
             }
             $this->restrictions[(string) $r->id] = $rr;
         }
@@ -608,7 +608,7 @@ class Ontology {
         ];
         $query = $this->pdo->prepare($query);
         $query->execute(array_merge($valuesParam, $param));
-        $tmp   = json_decode($query->fetchColumn());
+        $tmp   = json_decode((string) $query->fetchColumn());
 
         $concepts = [];
         foreach ($tmp as $i) {

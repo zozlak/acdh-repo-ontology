@@ -33,7 +33,7 @@ namespace acdhOeaw\arche\lib\schema;
  */
 class SkosConceptDesc extends BaseDesc {
 
-    public $id;
+    public ?int $id = null;
     /**
      * 
      * @var array<string, string>

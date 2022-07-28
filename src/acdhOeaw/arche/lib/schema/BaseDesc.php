@@ -37,31 +37,27 @@ class BaseDesc {
 
     /**
      * Internal id of a corresponding repository resource
-     * 
-     * @var int
      */
-    public $id;
+    public ?int $id = null;
 
     /**
      * The ontology entity URI within the ontology namespace
-     * 
-     * @var string
      */
-    public $uri;
+    public ?string $uri = null;
 
     /**
      * Associative array of label values (langauge as a key)
      * 
-     * @var string[]
+     * @var array<string>
      */
-    public $label = [];
+    public array $label = [];
 
     /**
      * Associative array of rdfs:comment values (langauge as a key)
      * 
-     * @var string[]
+     * @var array<string>
      */
-    public $comment = [];
+    public array $comment = [];
 
     /**
      * 
@@ -71,7 +67,7 @@ class BaseDesc {
      */
     public function __construct(object $d = null, array $ids = [],
                                 string $nmsp = null) {
-        $nmspL = strlen($nmsp);
+        $nmspL = strlen((string) $nmsp);
         foreach ($ids as $i) {
             if ($nmspL > 0 && substr($i, 0, $nmspL) === $nmsp) {
                 $this->uri = $i;
@@ -101,7 +97,7 @@ class BaseDesc {
                     if (property_exists($this, $prop)) {
                         if (is_array($this->$prop)) {
                             if (!empty($a->lang)) {
-                                $this->$prop[$a->lang] = $a->value;
+                                $this->$prop[$a->lang] = $a->value ?? '';
                             } else {
                                 $this->$prop[] = $a->value;
                             }
