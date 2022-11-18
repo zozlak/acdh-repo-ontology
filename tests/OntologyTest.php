@@ -39,6 +39,8 @@ use zozlak\RdfConstants as RDF;
  */
 class OntologyTest extends \PHPUnit\Framework\TestCase {
 
+    const CACHE_FILE = 'cache';
+
     /**
      *
      * @var \PDO
@@ -60,6 +62,12 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
                 'parent'            => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
                 'label'             => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
         ];
+    }
+
+    public function tearDown(): void {
+        if (file_exists(self::CACHE_FILE)) {
+            unlink(self::CACHE_FILE);
+        }
     }
 
     public function testInit(): void {
@@ -237,5 +245,42 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $o = new Ontology(self::$pdo, self::$schema);
         $p = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
         $this->assertEquals('Contact(s)', $p->label['en']);
+    }
+
+    public function testCache(): void {
+        $this->assertFileDoesNotExist(self::CACHE_FILE);
+
+        $t1     = microtime(true);
+        $o1     = new Ontology(self::$pdo, self::$schema, self::CACHE_FILE, 10);
+        $t1     = microtime(true) - $t1;
+        $this->assertFileExists(self::CACHE_FILE);
+        $mtime1 = filemtime(self::CACHE_FILE);
+
+        $t2 = microtime(true);
+        $o2 = new Ontology(self::$pdo, self::$schema, self::CACHE_FILE, 10);
+        $t2 = microtime(true) - $t2;
+        $this->assertEquals($mtime1, filemtime(self::CACHE_FILE));
+
+        sleep(2);
+
+        $t3 = microtime(true);
+        $o3 = new Ontology(self::$pdo, self::$schema, self::CACHE_FILE, 2);
+        $t3 = microtime(true) - $t3;
+        $this->assertGreaterThan($mtime1 + 3, filemtime(self::CACHE_FILE));
+
+        $c    = 'https://vocabs.acdh.oeaw.ac.at/schema#Collection';
+        $p    = 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense';
+        $p1   = $o1->getProperty($c, $p);
+        $p2   = $o2->getProperty($c, $p);
+        $p3   = $o3->getProperty($c, $p);
+        $attr = array_diff(array_keys((array) $p1), ['vocabularyValues', 'ontologyObj']);
+        foreach ($attr as $i) {
+            $this->assertEqualsCanonicalizing($p1->$i, $p2->$i);
+            $this->assertEqualsCanonicalizing($p1->$i, $p3->$i);
+        }
+        
+        $v1 = $p1->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL);
+        $this->assertEquals($v1, $p2->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
+        $this->assertEquals($v1, $p3->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
     }
 }

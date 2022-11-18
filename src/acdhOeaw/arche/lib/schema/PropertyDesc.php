@@ -118,11 +118,20 @@ class PropertyDesc extends BaseDesc {
      * 
      * @var array<SkosConceptDesc> | null
      */
-    private array $vocabularyValues;
+    private ?array $vocabularyValues;
     private Ontology $ontologyObj;
 
     public function setOntology(Ontology $ontology): void {
         $this->ontologyObj = $ontology;
+    }
+
+    public function __sleep(): array {
+        // skip vocabularyValues and ontologyObj
+        return [
+            'id', 'uri', 'label', 'comment', // BaseDesc
+            'property', 'type', 'domain', 'properties', 'range', 'min', 'max', 'recommendedClass', // self
+            'automatedFill', 'defaultValue', 'langTag', 'ordering', 'vocabs' // self
+        ];
     }
 
     public function __get(string $name): mixed {
@@ -130,6 +139,13 @@ class PropertyDesc extends BaseDesc {
             $this->vocabularyValues = $this->ontologyObj->getVocabularyValues($this->vocabs);
         }
         return $this->$name ?? null;
+    }
+
+    /**
+     * Used to restore the object after unserializing it from cache.
+     */
+    public function setOntologyObject(Ontology $ontology): void {
+        $this->ontologyObj = $ontology;
     }
 
     /**

@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\lib\schema;
 
 use PDO;
 use OutOfBoundsException;
+use RuntimeException;
 use EasyRdf\Resource;
 use zozlak\RdfConstants as RDF;
 
@@ -60,47 +61,72 @@ class Ontology {
 
     /**
      *
-     * @var ClassDesc[]
+     * @var array<ClassDesc>
      */
-    private $classes = [];
+    private array $classes = [];
 
     /**
      *
      * @var array<string, array<ClassDesc>>
      */
-    private $classesRev = [];
+    private array $classesRev = [];
 
     /**
      *
      * @var array<string, PropertyDesc>
      */
-    private $properties = [];
+    private array $properties = [];
 
     /**
      *
      * @var array<string, PropertyDesc>
      */
-    private $distinctProperties = [];
+    private array $distinctProperties = [];
 
     /**
      *
      * @var array<string, RestrictionDesc>
      */
-    private $restrictions = [];
+    private array $restrictions = [];
 
     /**
      * 
      * @param PDO $pdo
      * @param object $schema
+     * @param string|null $cache File storing ontology cache.
+     *   If empty or null, cache isn't used.
+     * @param $cacheTtl time in seconds for which the cache file is considered
+     *   valid. After that time (or when the cache file doesn't exist) the
+     *   cache file is regenerated.
      */
-    public function __construct(PDO $pdo, object $schema) {
+    public function __construct(PDO $pdo, object $schema, ?string $cache = null,
+                                int $cacheTtl = 600) {
         $this->pdo    = $pdo;
         $this->schema = $schema;
 
-        $this->loadClasses();
-        $this->loadProperties();
-        $this->loadRestrictions();
-        $this->preprocess();
+        if (!empty($cache) && file_exists($cache) && time() - filemtime($cache) <= $cacheTtl) {
+            list($this->classes, $this->classesRev, $this->properties, $this->distinctProperties, $this->restrictions) = unserialize(file_get_contents($cache) ?: throw new RuntimeException("Failed to load cache file"));
+            foreach ($this->distinctProperties as $i) {
+                $i->setOntologyObject($this);
+            }
+        } else {
+            $this->loadClasses();
+            $this->loadProperties();
+            $this->loadRestrictions();
+            $this->preprocess();
+            if (!empty($cache) && (!file_exists($cache) || time() - filemtime($cache) > $cacheTtl)) {
+                $toSerialize = [
+                    $this->classes, $this->classesRev,
+                    $this->properties, $this->distinctProperties,
+                    $this->restrictions
+                ];
+                $output      = tempnam(sys_get_temp_dir(), '') ?: throw new RuntimeException('Failed to create a temporary file');
+                $fh          = fopen($output, 'w') ?: throw new RuntimeException('Failed to create a temporary file');
+                fwrite($fh, serialize($toSerialize));
+                fclose($fh);
+                rename($output, $cache);
+            }
+        }
     }
 
     /**
@@ -348,7 +374,7 @@ class Ontology {
 
     private function loadProperties(): void {
         // much faster as it allows "property IN ()" clause in the next query
-        $query  = "
+        $query       = "
             SELECT i1.ids
             FROM
                 identifiers i1

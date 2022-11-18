@@ -44,3 +44,6 @@ print_r($property->getVocabularyValue('https://vocabs.acdh.oeaw.ac.at/archelicen
 print_r($property->vocabularyValues); // fetches all values
 echo $property->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('de'); // fetches all values first if they aren't loaded yet
 ```
+
+// store cache in ontology.cache and refresh it every 600s
+$ontology = new \acdhOeaw\arche\lib\schema\Ontology($conn, $cfg, 'ontology.cache', 600);
