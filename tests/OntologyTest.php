@@ -273,12 +273,16 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $p1   = $o1->getProperty($c, $p);
         $p2   = $o2->getProperty($c, $p);
         $p3   = $o3->getProperty($c, $p);
-        $attr = array_diff(array_keys((array) $p1), ['vocabularyValues', 'ontologyObj']);
+        $attr = [
+            'id', 'uri', 'label', 'comment', // BaseDesc
+            'property', 'type', 'domain', 'properties', 'range', 'min', 'max', 'recommendedClass',
+            'automatedFill', 'defaultValue', 'langTag', 'ordering', 'vocabs'
+        ];
         foreach ($attr as $i) {
             $this->assertEqualsCanonicalizing($p1->$i, $p2->$i);
             $this->assertEqualsCanonicalizing($p1->$i, $p3->$i);
         }
-        
+
         $v1 = $p1->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL);
         $this->assertEquals($v1, $p2->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
         $this->assertEquals($v1, $p3->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
