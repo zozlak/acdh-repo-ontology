@@ -106,8 +106,13 @@ class Ontology {
 
         if (!empty($cache) && file_exists($cache) && time() - filemtime($cache) <= $cacheTtl) {
             list($this->classes, $this->classesRev, $this->properties, $this->distinctProperties, $this->restrictions) = unserialize(file_get_contents($cache) ?: throw new RuntimeException("Failed to load cache file"));
-            foreach ($this->distinctProperties as $i) {
-                $i->setOntologyObject($this);
+            foreach ($this->distinctProperties as $p) {
+                $p->setOntologyObject($this);
+            }
+            foreach ($this->classes as $c) {
+                foreach ($c->properties as $p) {
+                    $p->setOntologyObject($this);
+                }
             }
         } else {
             $this->loadClasses();
