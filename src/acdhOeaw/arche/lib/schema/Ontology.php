@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\lib\schema;
 
 use PDO;
+use SplObjectStorage;
 use OutOfBoundsException;
 use RuntimeException;
 use EasyRdf\Resource;
@@ -199,6 +200,31 @@ class Ontology {
             }
         }
         return $this->properties[$property] ?? null;
+    }
+
+    /**
+     * Returns all classes known in the ontology.
+     * 
+     * @return array<ClassDesc>
+     */
+    public function getClasses(): array {
+        $distinct = new SplObjectStorage();
+        foreach ($this->classes as $i) {
+            $distinct->attach($i);
+        }
+        return iterator_to_array($distinct);
+    }
+
+    /**
+     * Returns all properties defined in the ontology.
+     * 
+     * Property defintions read that way lack cardinality info as the cardinality
+     * constraints are defined on the level of property and class.
+     * 
+     * @return array<PropertyDesc>
+     */
+    public function getProperties(): array {
+        return array_values($this->distinctProperties);
     }
 
     /**

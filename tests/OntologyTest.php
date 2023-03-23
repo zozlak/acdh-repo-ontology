@@ -287,4 +287,18 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals($v1, $p2->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
         $this->assertEquals($v1, $p3->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
     }
+
+    public function testGetClasses(): void {
+        $o = new Ontology(self::$pdo, self::$schema);
+        $c = $o->getClasses();
+        $this->assertGreaterThan(0, count($c));
+        $this->assertInstanceOf(ClassDesc::class, $c[0]);
+    }
+
+    public function testGetProperties(): void {
+        $o = new Ontology(self::$pdo, self::$schema);
+        $p = $o->getProperties();
+        $this->assertGreaterThan(0, count($p));
+        $this->assertInstanceOf(PropertyDesc::class, $p[0]);
+    }
 }
