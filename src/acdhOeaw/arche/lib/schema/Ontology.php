@@ -31,7 +31,14 @@ use SplObjectStorage;
 use OutOfBoundsException;
 use RuntimeException;
 use EasyRdf\Resource;
+use rdfInterface\LiteralInterface;
+use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
+use quickRdf\DataFactory as DF;
 use zozlak\RdfConstants as RDF;
+use acdhOeaw\arche\lib\Repo;
+use acdhOeaw\arche\lib\SearchTerm;
+use acdhOeaw\arche\lib\SearchConfig;
 
 /**
  * Provides an API for the ARCHE oontology.
@@ -57,8 +64,77 @@ class Ontology {
         RDF::SKOS_PREF_LABEL => self::VOCABSVALUE_PREFLABEL,
         RDF::SKOS_ALT_LABEL  => self::VOCABSVALUE_ALTLABEL,
     ];
+
+    /**
+     * 
+     * @param PDO $pdo
+     * @param object $schema
+     * @param string|null $cache File storing ontology cache.
+     *   If empty or null, cache isn't used.
+     * @param $cacheTtl time in seconds for which the cache file is considered
+     *   valid. After that time (or when the cache file doesn't exist) the
+     *   cache file is regenerated.
+     */
+    static public function factoryDb(PDO $pdo, object $schema,
+                                     ?string $cache = null, int $cacheTtl = 600): self {
+        if (!empty($cache) && file_exists($cache) && time() - filemtime($cache) <= $cacheTtl) {
+            $ontology      = self::factoryCache($cache);
+            $ontology->pdo = $pdo;
+            return $ontology;
+        }
+
+        $ontology         = new Ontology();
+        $ontology->pdo    = $pdo;
+        $ontology->schema = $schema;
+        $ontology->loadClassesDb();
+        $ontology->loadPropertiesDb();
+        $ontology->loadRestrictionsDb();
+        $ontology->preprocess();
+
+        if (!empty($cache) && (!file_exists($cache) || time() - filemtime($cache) > $cacheTtl)) {
+            $ontology->saveCache($cache);
+        }
+        return $ontology;
+    }
+
+    static public function factoryRest(string $url, ?string $cache = null,
+                                       int $cacheTtl = 600): self {
+        if (!empty($cache) && file_exists($cache) && time() - filemtime($cache) <= $cacheTtl) {
+            $ontology         = self::factoryCache($cache);
+            $ontology->repo   = Repo::factoryFromUrl($url);
+            $ontology->schema = $ontology->repo->getSchema();
+            return $ontology;
+        }
+
+        $ontology         = new Ontology();
+        $ontology->repo   = Repo::factoryFromUrl($url);
+        $ontology->schema = $ontology->repo->getSchema();
+        $ontology->loadRest();
+        $ontology->preprocess();
+
+        if (!empty($cache) && (!file_exists($cache) || time() - filemtime($cache) > $cacheTtl)) {
+            $ontology->saveCache($cache);
+        }
+        return $ontology;
+    }
+
+    static public function factoryCache(string $cachePath): self {
+        $ontology = new Ontology();
+        list($ontology->classes, $ontology->classesRev, $ontology->properties, $ontology->distinctProperties, $ontology->restrictions, $ontology->schema) = unserialize(file_get_contents($cachePath) ?: throw new RuntimeException("Failed to load cache file"));
+        foreach ($ontology->distinctProperties as $p) {
+            $p->setOntologyObject($ontology);
+        }
+        foreach ($ontology->classes as $c) {
+            foreach ($c->properties as $p) {
+                $p->setOntologyObject($ontology);
+            }
+        }
+        return $ontology;
+    }
+
     private PDO $pdo;
     private object $schema;
+    private Repo $repo;
 
     /**
      *
@@ -90,49 +166,17 @@ class Ontology {
      */
     private array $restrictions = [];
 
-    /**
-     * 
-     * @param PDO $pdo
-     * @param object $schema
-     * @param string|null $cache File storing ontology cache.
-     *   If empty or null, cache isn't used.
-     * @param $cacheTtl time in seconds for which the cache file is considered
-     *   valid. After that time (or when the cache file doesn't exist) the
-     *   cache file is regenerated.
-     */
-    public function __construct(PDO $pdo, object $schema, ?string $cache = null,
-                                int $cacheTtl = 600) {
-        $this->pdo    = $pdo;
-        $this->schema = $schema;
-
-        if (!empty($cache) && file_exists($cache) && time() - filemtime($cache) <= $cacheTtl) {
-            list($this->classes, $this->classesRev, $this->properties, $this->distinctProperties, $this->restrictions) = unserialize(file_get_contents($cache) ?: throw new RuntimeException("Failed to load cache file"));
-            foreach ($this->distinctProperties as $p) {
-                $p->setOntologyObject($this);
-            }
-            foreach ($this->classes as $c) {
-                foreach ($c->properties as $p) {
-                    $p->setOntologyObject($this);
-                }
-            }
-        } else {
-            $this->loadClasses();
-            $this->loadProperties();
-            $this->loadRestrictions();
-            $this->preprocess();
-            if (!empty($cache) && (!file_exists($cache) || time() - filemtime($cache) > $cacheTtl)) {
-                $toSerialize = [
-                    $this->classes, $this->classesRev,
-                    $this->properties, $this->distinctProperties,
-                    $this->restrictions
-                ];
-                $output      = tempnam(sys_get_temp_dir(), '') ?: throw new RuntimeException('Failed to create a temporary file');
-                $fh          = fopen($output, 'w') ?: throw new RuntimeException('Failed to create a temporary file');
-                fwrite($fh, serialize($toSerialize));
-                fclose($fh);
-                rename($output, $cache);
-            }
-        }
+    public function saveCache(string $path): void {
+        $toSerialize = [
+            $this->classes, $this->classesRev,
+            $this->properties, $this->distinctProperties,
+            $this->restrictions, $this->schema,
+        ];
+        $output      = tempnam(sys_get_temp_dir(), '') ?: throw new RuntimeException('Failed to create a temporary file');
+        $fh          = fopen($output, 'w') ?: throw new RuntimeException('Failed to create a temporary file');
+        fwrite($fh, serialize($toSerialize));
+        fclose($fh);
+        rename($output, $path);
     }
 
     /**
@@ -234,15 +278,19 @@ class Ontology {
      * @return array<SkosConceptDesc>
      */
     public function getVocabularyValues(string $vocabularyUrl): array {
-        $query = "
+        if (isset($this->pdo)) {
+            $query = "
             SELECT r.id
             FROM
                 identifiers i
                 JOIN relations r ON r.target_id = i.id AND r.property = ?
             WHERE ids = ?
         ";
-        $param = [RDF::SKOS_IN_SCHEME, $vocabularyUrl];
-        return $this->fetchVocabularyValues($query, $param);
+            $param = [RDF::SKOS_IN_SCHEME, $vocabularyUrl];
+            return $this->fetchVocabularyValuesDb($query, $param);
+        } else {
+            return $this->fetchVocabularyValuesRest($vocabularyUrl);
+        }
     }
 
     /**
@@ -261,9 +309,13 @@ class Ontology {
         if ($id === false) {
             return null;
         }
-        $query = "SELECT id FROM identifiers WHERE ids = ?";
-        $param = [$id];
-        $value = $this->fetchVocabularyValues($query, $param);
+        if (isset($this->pdo)) {
+            $query = "SELECT id FROM identifiers WHERE ids = ?";
+            $param = [$id];
+            $value = $this->fetchVocabularyValuesDb($query, $param);
+        } else {
+            $value = $this->fetchVocabularyValuesRest($vocabularyUrl, $id);
+        }
         return array_pop($value);
     }
 
@@ -279,6 +331,16 @@ class Ontology {
      */
     public function checkVocabularyValue(string $vocabularyUrl, string $value,
                                          int $searchIn = self::VOCABSVALUE_ID): string | false {
+        if (isset($this->pdo)) {
+            return $this->checkVocabularyValueDb($vocabularyUrl, $value, $searchIn);
+        } else {
+            return $this->checkVocabularyValueRest($vocabularyUrl, $value, $searchIn);
+        }
+    }
+
+    private function checkVocabularyValueDb(string $vocabularyUrl,
+                                            string $value,
+                                            int $searchIn = self::VOCABSVALUE_ID): string | false {
         if ($searchIn & self::VOCABSVALUE_ID) {
             $query = "
                 SELECT count(*)
@@ -329,7 +391,30 @@ class Ontology {
         return false;
     }
 
-    private function loadClasses(): void {
+    private function checkVocabularyValueRest(string $vocabularyUrl,
+                                              string $value,
+                                              int $searchIn = self::VOCABSVALUE_ID): string | false {
+        $allowedProps = [(string) $this->schema->id];
+        foreach (self::$vocabsValueProperties as $prop => $mask) {
+            if ($searchIn & $mask) {
+                $allowedProps[] = $prop;
+            }
+        }
+        $terms                   = [
+            new SearchTerm(RDF::SKOS_IN_SCHEME, $vocabularyUrl),
+            new SearchTerm($allowedProps, $value),
+        ];
+        $cfg                     = new SearchConfig();
+        $cfg->metadataMode       = '0_0_0_0';
+        $cfg->resourceProperties = [(string) $this->schema->id];
+        $graph                   = $this->repo->getGraphBySearchTerms($terms, $cfg);
+        if (1 === (int) $graph->getObjectValue(new QT(DF::namedNode($this->repo->getBaseUrl()), $this->schema->searchCount))) {
+            return $searchIn === self::VOCABSVALUE_ID ? $value : $graph->getObjectValue(new PT($this->schema->id));
+        }
+        return false;
+    }
+
+    private function loadClassesDb(): void {
         $query = "
             WITH RECURSIVE t(pid, id, n) AS (
                 SELECT DISTINCT id, id, 0
@@ -354,12 +439,12 @@ class Ontology {
             FROM
                 tt
                 JOIN (
-                    SELECT id, json_agg(ids ORDER BY ids) AS class
+                    SELECT id, json_agg(DISTINCT ids ORDER BY ids) AS class
                     FROM tt JOIN identifiers USING (id)
                     GROUP BY 1
                 ) c1 USING (id)
                 JOIN (
-                    SELECT t.id, json_agg(ids ORDER BY n DESC, ids) AS classes 
+                    SELECT t.id, json_agg(DISTINCT ids ORDER BY ids) AS classes 
                     FROM t JOIN identifiers i ON t.pid = i.id
                     GROUP BY 1
                 ) c2 USING (id)
@@ -381,6 +466,7 @@ class Ontology {
             RDF::RDFS_SUB_CLASS_OF, RDF::OWL_EQUIVALENT_CLASS, // with recursive
             RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c3 (label), c4 (comment)
         ];
+        //exit("\n".(new \zozlak\queryPart\QueryPart($query, $param))."\n");
         $query = $this->pdo->prepare($query);
         $query->execute($param);
         while ($c     = $query->fetch(PDO::FETCH_OBJ)) {
@@ -392,18 +478,10 @@ class Ontology {
             $this->classes[(string) $c->id] = $cc;
         }
 
-        // reverse class index (from a class to all inheriting from it)
-        foreach ($this->classes as $c) {
-            foreach ($c->classes as $cStr) {
-                if (!isset($this->classesRev[$cStr])) {
-                    $this->classesRev[$cStr] = [];
-                }
-                $this->classesRev[$cStr][] = $this->classes[$c->class[0]];
-            }
-        }
+        $this->buildClassesRevIndex();
     }
 
-    private function loadProperties(): void {
+    private function loadPropertiesDb(): void {
         // much faster as it allows "property IN ()" clause in the next query
         $query       = "
             SELECT i1.ids
@@ -503,18 +581,11 @@ class Ontology {
         while ($p     = $query->fetch(PDO::FETCH_OBJ)) {
             $propList = json_decode($p->property);
             $prop     = new PropertyDesc($p, $propList, $this->schema->ontologyNamespace);
-            if (!empty($prop->vocabs)) {
-                $prop->setOntology($this);
-            }
-            foreach ($propList as $i) {
-                $this->properties[(string) $i] = $prop;
-            }
-            $this->properties[(string) $p->id]         = $prop;
-            $this->distinctProperties[(string) $p->id] = $prop;
+            $this->loadPropertyCommon($prop);
         }
     }
 
-    private function loadRestrictions(): void {
+    private function loadRestrictionsDb(): void {
         $query = "
             SELECT 
                 t.id, class, onproperty, 
@@ -546,13 +617,182 @@ class Ontology {
         $query = $this->pdo->prepare($query);
         $query->execute($param);
         while ($r     = $query->fetch(PDO::FETCH_OBJ)) {
-            $classList = json_decode($r->class);
-            $rr        = new RestrictionDesc($r);
-            foreach ($classList as $i) {
-                $this->restrictions[(string) $i] = $rr;
-            }
-            $this->restrictions[(string) $r->id] = $rr;
+            $rr = new RestrictionDesc($r);
+            $this->loadRestrictionCommon($rr);
         }
+    }
+
+    private function loadRest(): void {
+        $idPred                  = (string) $this->schema->id;
+        $nmsp                    = (string) $this->schema->namespaces?->ontology;
+        $baseUrl                 = $this->repo->getBaseUrl();
+        $baseUrlL                = strlen($baseUrl);
+        $mapping                 = [
+            RDF::SKOS_ALT_LABEL          => 'label',
+            RDF::RDFS_COMMENT            => 'comment',
+            RDF::OWL_EQUIVALENT_CLASS    => 'ids',
+            RDF::RDFS_SUB_CLASS_OF       => 'parent',
+            RDF::OWL_EQUIVALENT_PROPERTY => 'ids',
+            RDF::RDFS_SUB_PROPERTY_OF    => 'parent',
+            RDF::RDFS_RANGE              => 'range',
+            RDF::RDFS_DOMAIN             => 'domain',
+            RDF::OWL_ON_PROPERTY         => 'onProperty',
+            RDF::OWL_CARDINALITY         => 'cardinality',
+            RDF::OWL_MIN_CARDINALITY     => 'min',
+            RDF::OWL_MAX_CARDINALITY     => 'max',
+            $idPred                      => 'ids',
+            RDF::RDF_TYPE                => 'type',
+            $nmsp . 'automatedFill'      => 'automatedFill',
+            $nmsp . 'defaultValue'       => 'defaultValue',
+            $nmsp . 'langTag'            => 'langTag',
+            $nmsp . 'ordering'           => 'ordering',
+            $nmsp . 'recommendedClass'   => 'recommendedClass',
+            $nmsp . 'vocabs'             => 'vocabs',
+        ];
+        $term                    = new SearchTerm(
+            RDF::RDF_TYPE,
+            [RDF::OWL_CLASS, RDF::OWL_RESTRICTION, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY]
+        );
+        $cfg                     = new SearchConfig();
+        $cfg->metadataMode       = '0_0_1_0';
+        $cfg->resourceProperties = array_keys($mapping);
+        $quads                   = $this->repo->getGraphBySearchTerms([$term], $cfg);
+        $objects                 = [];
+        foreach ($quads as $quad) {
+            $sbj  = $quad->getSubject()->getValue();
+            $pred = $mapping[$quad->getPredicate()->getValue()] ?? null;
+            if ($sbj === $baseUrl || $pred === null) {
+                continue;
+            }
+            $obj = $quad->getObject();
+            if (!isset($objects[$sbj])) {
+                $objects[$sbj] = (object) ['id' => (int) substr($sbj, $baseUrlL)];
+            }
+            if (in_array($pred, ['type', 'automatedFill', 'defaultValue', 'langTag',
+                    'ordering', 'vocabs', 'min', 'max'])) {
+                $objects[$sbj]->$pred = $obj->getValue();
+            } elseif ($pred === 'cardinality') {
+                $objects[$sbj]->min = $obj->getValue();
+                $objects[$sbj]->max = $obj->getValue();
+            } elseif ($pred === 'ids') {
+                $objects[$obj->getValue()] = $objects[$sbj];
+                $objects[$sbj]->ids[]      = $obj->getValue();
+            } elseif ($obj instanceof LiteralInterface) {
+                $objects[$sbj]->$pred[$obj->getLang()] = $obj->getValue();
+            } else {
+                $obj = $obj->getValue();
+                if (!isset($objects[$obj])) {
+                    $objects[$obj] = (object) ['id' => (int) substr($obj, $baseUrlL)];
+                }
+                $objects[$sbj]->$pred[] = $objects[$obj];
+            }
+        }
+        $loaded = new SplObjectStorage();
+        foreach ($objects as $obj) {
+            if ($loaded->contains($obj)) {
+                continue;
+            }
+            $loaded->attach($obj);
+            match ($obj->type ?? null) {
+                RDF::OWL_CLASS => $this->loadClassRest($obj, $nmsp),
+                RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY => $this->loadPropertyRest($obj, $nmsp),
+                RDF::OWL_RESTRICTION => $this->loadRestrictionRest($obj, $nmsp),
+                default => null
+            };
+        }
+        $this->buildClassesRevIndex();
+    }
+
+    private function loadClassRest(object $data, string $nmsp): void {
+        $data->class   = $data->ids;
+        $data->classes = $data->ids;
+        $class         = new ClassDesc($data, $data->ids, $nmsp);
+        $visited       = new SplObjectStorage();
+        $visited->attach($data);
+        $this->resolveParents($class, 'classes', $data->parent ?? [], $visited);
+        sort($class->classes);
+        foreach ($class->class as $i) {
+            $this->classes[$i] = $class;
+        }
+    }
+
+    private function loadPropertyRest(object $data, string $nmsp): void {
+        $data->property   = $data->ids;
+        $data->properties = $data->ids;
+        if (isset($data->domain)) {
+            $data->domain = array_unique(array_merge(...array_map(fn($x) => $x->ids, $data->domain)));
+        }
+        if (isset($data->range)) {
+            $data->range = array_unique(array_merge(...array_map(fn($x) => $x->ids, $data->range)));
+        }
+        if (isset($data->recommendedClass)) {
+            $data->recommendedClass = array_unique(array_merge(...array_map(fn($x) => $x->ids, $data->recommendedClass)));
+        }
+        $prop    = new PropertyDesc($data, $data->ids, $nmsp);
+        $visited = new SplObjectStorage();
+        $visited->attach($data);
+        $this->resolveParents($prop, 'properties', $data->parent ?? [], $visited);
+        sort($prop->properties);
+        $this->loadPropertyCommon($prop);
+    }
+
+    private function loadRestrictionRest(object $data, string $nmsp): void {
+        $data->class = $data->ids;
+        if (isset($data->onProperty)) {
+            $data->onProperty = array_unique(array_merge(...array_map(fn($x) => $x->ids, $data->onProperty)));
+        }
+        $restriction = new RestrictionDesc($data, $data->ids, $nmsp);
+        $this->loadRestrictionCommon($restriction);
+    }
+
+    /**
+     * 
+     * @param BaseDesc $obj
+     * @param string $prop
+     * @param array<object> $parents
+     * @param SplObjectStorage<object, null> $visited
+     * @return void
+     */
+    private function resolveParents(BaseDesc $obj, string $prop, array $parents,
+                                    SplObjectStorage $visited): void {
+        foreach ($parents as $parent) {
+            if ($visited->contains($parent)) {
+                continue;
+            }
+            $visited->attach($parent);
+            $obj->$prop = array_merge($obj->$prop, $parent->ids ?? []);
+            $this->resolveParents($obj, $prop, $parent->parent ?? [], $visited);
+        }
+    }
+
+    private function buildClassesRevIndex(): void {
+        // reverse class index (from a class to all inheriting from it)
+        foreach ($this->classes as $c) {
+            foreach ($c->classes as $cStr) {
+                if (!isset($this->classesRev[$cStr])) {
+                    $this->classesRev[$cStr] = [];
+                }
+                $this->classesRev[$cStr][] = $this->classes[$c->class[0]];
+            }
+        }
+    }
+
+    private function loadPropertyCommon(PropertyDesc $prop): void {
+        if (!empty($prop->vocabs)) {
+            $prop->setOntology($this);
+        }
+        foreach ($prop->property as $i) {
+            $this->properties[(string) $i] = $prop;
+        }
+        $this->properties[(string) $prop->id]         = $prop;
+        $this->distinctProperties[(string) $prop->id] = $prop;
+    }
+
+    private function loadRestrictionCommon(RestrictionDesc $restriction): void {
+        foreach ($restriction->class as $i) {
+            $this->restrictions[(string) $i] = $restriction;
+        }
+        $this->restrictions[(string) $restriction->id] = $restriction;
     }
 
     /**
@@ -564,17 +804,16 @@ class Ontology {
         $classes = array_keys($this->classes);
         foreach ($this->distinctProperties as $p) {
             $classMatch       = array_intersect($p->domain, $classes);
-            $processedClasses = [];
+            $processedClasses = new SplObjectStorage();
             foreach ($classMatch as $cid) {
                 foreach ($this->classesRev[$cid] as $c) {
-                    $cHash = (string) spl_object_id($c);
-                    if (!isset($processedClasses[$cHash])) {
+                    if (!$processedClasses->contains($c)) {
                         $pp                   = clone($p); // clone because restrictions apply to a {property, class}
                         $pp->recommendedClass = count(array_intersect($c->classes, $p->recommendedClass)) > 0;
                         foreach ($pp->property as $puri) {
                             $c->properties[$puri] = $pp;
                         }
-                        $processedClasses[$cHash] = true;
+                        $processedClasses->attach($c);
                     }
                 }
             }
@@ -584,14 +823,13 @@ class Ontology {
         $restrClasses = array_keys($this->restrictions);
         foreach ($this->classes as $c) {
             $restrMatch     = array_intersect($restrClasses, $c->classes);
-            $processedRestr = [];
+            $processedRestr = new SplObjectStorage();
             foreach ($restrMatch as $rid) {
-                $r     = $this->restrictions[$rid];
-                $rHash = (string) spl_object_id($r);
-                if (!isset($processedRestr[$rHash]) && isset($c->properties[$r->onProperty[0]])) {
+                $r = $this->restrictions[$rid];
+                if (!$processedRestr->contains($r) && isset($c->properties[$r->onProperty[0]])) {
                     try {
-                        $processedRestr[$rHash] = true;
-                        $p                      = $c->properties[$r->onProperty[0]];
+                        $processedRestr->attach($r);
+                        $p = $c->properties[$r->onProperty[0]];
                         if (!empty($r->range)) {
                             $p->range = $r->range;
                         }
@@ -617,8 +855,8 @@ class Ontology {
      * @param array<mixed> $valuesParam
      * @return array<SkosConceptDesc>
      */
-    private function fetchVocabularyValues(string $valuesQuery,
-                                           array $valuesParam): array {
+    private function fetchVocabularyValuesDb(string $valuesQuery,
+                                             array $valuesParam): array {
         $query = "
             WITH c AS ($valuesQuery)
             SELECT json_agg(row_to_json(t))
@@ -669,23 +907,15 @@ class Ontology {
 
         $concepts = [];
         foreach ($tmp as $i) {
-            $langs = array_map(function ($x) {
-                return $x->lang;
-            }, $i->label);
-            $labels = array_map(function ($x) {
-                return $x->value;
-            }, $i->label);
+            $langs                           = array_map(fn($x) => $x->lang, $i->label);
+            $labels                          = array_map(fn($x) => $x->value, $i->label);
             $i->label                        = array_combine($langs, $labels);
             $concept                         = new SkosConceptDesc($i);
             $concepts[(string) $concept->id] = $concept;
         }
         foreach ($concepts as $i) {
-            $i->broader = array_map(function ($x) use ($concepts) {
-                return $concepts[(string) $x];
-            }, $i->broader);
-            $i->narrower = array_map(function ($x) use ($concepts) {
-                return $concepts[(string) $x];
-            }, $i->narrower);
+            $i->broader  = array_map(fn($x) => $concepts[(string) $x], $i->broader);
+            $i->narrower = array_map(fn($x) => $concepts[(string) $x], $i->narrower);
         }
         $result = [];
         foreach ($concepts as $c) {
@@ -694,5 +924,74 @@ class Ontology {
             }
         }
         return $result;
+    }
+
+    /**
+      /**
+     * Fetches information about SKOS concepts and formats them as SkosConceptDesc
+     * objects.
+     * 
+     * @param string $vocabularyUrl
+     * @return array<SkosConceptDesc>
+     */
+    private function fetchVocabularyValuesRest(string $vocabularyUrl,
+                                               ?string $conceptUri = null): array {
+        $baseUrl  = $this->repo->getBaseUrl();
+        $baseUrlL = strlen($baseUrl);
+        $nmsp     = (string) $this->schema->namespaces?->ontology;
+        $mapping  = [
+            (string) $this->schema->id    => 'ids',
+            (string) $this->schema->label => 'label',
+            RDF::SKOS_NOTATION            => 'notation',
+            RDF::SKOS_NARROWER            => 'narrower',
+            RDF::SKOS_BROADER             => 'broader',
+        ];
+        $terms    = [new SearchTerm(RDF::SKOS_IN_SCHEME, $vocabularyUrl)];
+        if (!empty($conceptUri)) {
+            $terms[] = new SearchTerm((string) $this->schema->id, $conceptUri);
+        }
+        $cfg                     = new SearchConfig();
+        $cfg->metadataMode       = '0_0_0_0';
+        $cfg->resourceProperties = array_keys($mapping);
+        $quads                   = $this->repo->getGraphBySearchTerms($terms, $cfg);
+        $objects                 = [];
+        foreach ($quads as $quad) {
+            $sbj  = $quad->getSubject()->getValue();
+            $pred = $mapping[$quad->getPredicate()->getValue()] ?? null;
+            if ($sbj === $baseUrl || $pred === null) {
+                continue;
+            }
+            $obj = $quad->getObject();
+            if (!isset($objects[$sbj])) {
+                $objects[$sbj] = (object) ['id' => (int) substr($sbj, $baseUrlL)];
+            }
+            if ($pred === 'ids') {
+                $objects[$obj->getValue()] = $objects[$sbj];
+                $objects[$sbj]->ids[]      = $obj->getValue();
+            } elseif ($pred === 'notation') {
+                $objects[$sbj]->$pred[] = $obj->getValue();
+            } elseif ($obj instanceof LiteralInterface) {
+                $objects[$sbj]->$pred[$obj->getLang()] = $obj->getValue();
+            } else {
+                $obj = $obj->getValue();
+                if (!isset($objects[$obj])) {
+                    $objects[$obj] = (object) ['id' => (int) substr($obj, $baseUrlL)];
+                }
+                $objects[$sbj]->$pred[] = $objects[$obj];
+            }
+        }
+        $concepts = [];
+        foreach ($objects as $i) {
+            $i->concept = $i->ids;
+            $concept    = new SkosConceptDesc($i, $i->ids, $nmsp);
+            foreach ($concept->concept as $c) {
+                $concepts[$c] = $concept;
+            }
+        }
+        foreach ($concepts as $i) {
+            $i->broader  = array_map(fn($x) => $x instanceof SkosConceptDesc ? $x : $concepts[reset($x->ids)], $i->broader);
+            $i->narrower = array_map(fn($x) => $x instanceof SkosConceptDesc ? $x : $concepts[reset($x->ids)], $i->narrower);
+        }
+        return $concepts;
     }
 }

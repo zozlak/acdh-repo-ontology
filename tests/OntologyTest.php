@@ -70,235 +70,285 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         }
     }
 
+    /**
+     * 
+     * @return array<Ontology>
+     */
+    private function getOntologies(): array {
+        return [
+            'db'   => Ontology::factoryDb(self::$pdo, self::$schema),
+            'rest' => Ontology::factoryRest('http://127.0.0.1/api'),
+        ];
+    }
+
     public function testInit(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $this->assertNotNull($o);
+        foreach ($this->getOntologies() as $k => $o) {
+            $this->assertNotNull($o, $k);
+        }
     }
 
     public function testClassLabelComment(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $this->assertArrayHasKey('en', $c->label);
-        $this->assertArrayHasKey('de', $c->label);
-        $this->assertArrayHasKey('en', $c->comment);
-        $this->assertArrayHasKey('de', $c->comment);
-        $this->assertEquals('Collection', $c->label['en']);
-        $this->assertEquals($c->label['en'], $c->getLabel('en'));
-        $this->assertEquals($c->label['de'], $c->getLabel('de'));
-        $this->assertEquals($c->comment['en'], $c->getComment('en'));
-        $this->assertEquals($c->comment['de'], $c->getComment('de'));
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $this->assertArrayHasKey('en', $c->label, $k);
+            $this->assertArrayHasKey('de', $c->label, $k);
+            $this->assertArrayHasKey('en', $c->comment, $k);
+            $this->assertArrayHasKey('de', $c->comment, $k);
+            $this->assertEquals('Collection', $c->label['en'], $k);
+            $this->assertEquals($c->label['en'], $c->getLabel('en'), $k);
+            $this->assertEquals($c->label['de'], $c->getLabel('de'), $k);
+            $this->assertEquals($c->comment['en'], $c->getComment('en'), $k);
+            $this->assertEquals($c->comment['de'], $c->getComment('de'), $k);
+        }
     }
 
     public function testClassInheritance(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
+        foreach ($this->getOntologies() as $k => $o) {
+            $r1 = (new Graph())->resource('.');
+            $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $this->assertTrue($o->isA($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'), $k);
 
-        $r1 = (new Graph())->resource('.');
-        $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $this->assertTrue($o->isA($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
+            $r2 = (new Graph())->resource('.');
+            $r2->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
+            $this->assertTrue($o->isA($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'), $k);
 
-        $r2 = (new Graph())->resource('.');
-        $r2->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
-        $this->assertTrue($o->isA($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
+            $r3 = (new Graph())->resource('.');
+            $r3->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Agent');
+            $this->assertFalse($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'), $k);
 
-        $r3 = (new Graph())->resource('.');
-        $r3->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Agent');
-        $this->assertFalse($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
-
-        $r3->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject');
-        $this->assertTrue($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'));
+            $r3->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject');
+            $this->assertTrue($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'), $k);
+        }
     }
 
     public function testClassGetProperties(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p = $c->getProperties();
-        $this->assertEquals(count(array_unique(array_map('spl_object_id', $p))), count($p));
-        $this->assertEquals(count(array_unique(array_map('spl_object_id', $c->properties))), count($p));
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p = $c->getProperties();
+            $this->assertEquals(count(array_unique(array_map('spl_object_id', $p))), count($p), $k);
+            $this->assertEquals(count(array_unique(array_map('spl_object_id', $c->properties))), count($p), $k);
+        }
     }
 
     public function testPropertyPropertiesInitialized(): void {
-        $o  = new Ontology(self::$pdo, self::$schema);
-        $p  = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense');
-        $rc = new ReflectionClass($p);
-        foreach ($rc->getProperties(ReflectionProperty::IS_PUBLIC) as $i) {
-            $rp = new ReflectionProperty($p, $i->name);
-            $rt = $rp->getType();
-            if ($rt !== null && !$rt->allowsNull()) {
-                $this->assertTrue(isset($p->{$i->name}), "propertyDesc->" . $i->name . " is not initialized");
+        foreach ($this->getOntologies() as $k => $o) {
+            $p  = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense');
+            $rc = new ReflectionClass($p);
+            foreach ($rc->getProperties(ReflectionProperty::IS_PUBLIC) as $i) {
+                $rp = new ReflectionProperty($p, $i->name);
+                $rt = $rp->getType();
+                if ($rt !== null && !$rt->allowsNull()) {
+                    $this->assertTrue(isset($p->{$i->name}), "propertyDesc->" . $i->name . " is not initialized ($k)");
+                }
             }
         }
     }
 
     public function testCardinalitiesIndirect(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
+        foreach ($this->getOntologies() as $k => $o) {
+            $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor'; //defined for RepoObject
+            $this->assertArrayHasKey($pUri, $c->properties, $k);
+            $this->assertEquals(1, $c->properties[$pUri]->min, $k);
 
-        $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor'; //defined for RepoObject
-        $this->assertArrayHasKey($pUri, $c->properties);
-        $this->assertEquals(1, $c->properties[$pUri]->min);
-
-        $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
-        $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasNote';
-        $this->assertArrayHasKey($pUri, $c->properties);
-        $this->assertNull($c->properties[$pUri]->min);
+            $c    = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
+            $pUri = 'https://vocabs.acdh.oeaw.ac.at/schema#hasNote';
+            $this->assertArrayHasKey($pUri, $c->properties, $k);
+            $this->assertNull($c->properties[$pUri]->min, $k);
+        }
     }
 
     public function testCardinalitiesDirect(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
+        foreach ($this->getOntologies() as $k => $o) {
+            $r1 = (new Graph())->resource('.');
+            $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#TopCollection');
+            $p1 = $o->getProperty($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+            $this->assertEquals(1, $p1->min, $k);
 
-        $r1 = (new Graph())->resource('.');
-        $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#TopCollection');
-        $p1 = $o->getProperty($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
-        $this->assertEquals(1, $p1->min);
+            $r2 = (new Graph())->resource('.');
+            $r2->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
+            $p2 = $o->getProperty($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+            $this->assertNull($p2->min, $k);
 
-        $r2 = (new Graph())->resource('.');
-        $r2->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
-        $p2 = $o->getProperty($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
-        $this->assertNull($p2->min);
-
-        $this->assertNull($o->getProperty($r2, 'https://foo/bar'));
+            $this->assertNull($o->getProperty($r2, 'https://foo/bar'), $k);
+        }
     }
 
     public function testPropertyDomainRange(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $r = (new Graph())->resource('.');
-        $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasAcceptedDate');
-        $this->assertContains('http://www.w3.org/2001/XMLSchema#date', $p->range);
-        $this->assertContains('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject', $p->domain);
+        foreach ($this->getOntologies() as $k => $o) {
+            $r = (new Graph())->resource('.');
+            $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasAcceptedDate');
+            $this->assertContains('http://www.w3.org/2001/XMLSchema#date', $p->range, $k);
+            $this->assertContains('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject', $p->domain, $k);
+        }
     }
 
     public function testPropertyLabelComment(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasContact'];
-        $this->assertArrayHasKey('en', $p->label);
-        $this->assertArrayHasKey('de', $p->label);
-        $this->assertArrayHasKey('en', $p->comment);
-        $this->assertEquals('Contact(s)', $p->label['en']);
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasContact'];
+            $this->assertArrayHasKey('en', $p->label, $k);
+            $this->assertArrayHasKey('de', $p->label, $k);
+            $this->assertArrayHasKey('en', $p->comment, $k);
+            $this->assertEquals('Contact(s)', $p->label['en'], $k);
+        }
     }
 
     public function testPropertyLangTag(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
-        $this->assertEquals(1, $p->langTag);
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
+            $this->assertEquals(1, $p->langTag, $k);
+        }
     }
 
     public function testPropertyVocabs(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/rest/v1/arche_licenses/data', $p->vocabs);
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+            $this->assertEquals('https://vocabs.acdh.oeaw.ac.at/rest/v1/arche_licenses/data', $p->vocabs, $k);
+        }
     }
 
     public function testPropertyVocabularyValues(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0', $p->vocabularyValues);
-        $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'));
-        $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'));
-        $this->assertEquals('Namensnennung 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'de'));
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+            $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0', $p->vocabularyValues, $k);
+            $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'), $k);
+            $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'), $k);
+            $this->assertEquals('Namensnennung 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'de'), $k);
+
+            $c       = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Resource');
+            $p       = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasCategory'];
+            $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/archecategory/image', $p->vocabularyValues, $k);
+            $concept = $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archecategory/image'];
+            $this->assertInstanceOf(SkosConceptDesc::class, $concept->narrower[0]);
+            $this->assertEquals($concept, $concept->narrower[0]->broader[0], $k);
+
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Project');
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasRelatedDiscipline'];
+            $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/oefosdisciplines/102003', $p->vocabularyValues);
+            $this->assertEquals(['102003'], $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/oefosdisciplines/102003']->notation);
+        }
     }
 
     public function testPropertyGetVocabularyValues(): void {
-        $o  = new Ontology(self::$pdo, self::$schema);
-        $c  = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p  = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $vv = $p->getVocabularyValues();
-        $this->assertEquals(count(array_unique(array_map('spl_object_id', $vv))), count($vv));
-        $this->assertEquals(count(array_unique(array_map('spl_object_id', $p->vocabularyValues))), count($vv));
+        foreach ($this->getOntologies() as $k => $o) {
+            $c  = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p  = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+            $vv = $p->getVocabularyValues();
+            $this->assertEquals(count(array_unique(array_map('spl_object_id', $vv))), count($vv), $k);
+            $this->assertEquals(count(array_unique(array_map('spl_object_id', $p->vocabularyValues))), count($vv), $k);
+        }
     }
 
     public function testPropertyCheckVocabularyValue(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $this->assertIsString($p->checkVocabularyValue('https://vocabs.acdh.oeaw.ac.at/archelicenses/publicdomain-1-0'));
-        $this->assertFalse($p->checkVocabularyValue('Public Domain Mark 1.0'));
-        $this->assertIsString($p->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
-        $this->assertFalse($p->checkVocabularyValue('foo', Ontology::VOCABSVALUE_ALL));
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+            $this->assertIsString($p->checkVocabularyValue('https://vocabs.acdh.oeaw.ac.at/archelicenses/publicdomain-1-0'), $k);
+            $this->assertFalse($p->checkVocabularyValue('Public Domain Mark 1.0'), $k);
+            $this->assertIsString($p->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL), $k);
+            $this->assertFalse($p->checkVocabularyValue('foo', Ontology::VOCABSVALUE_ALL), $k);
 
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
-        $this->assertTrue($p->checkVocabularyValue('foo'));
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
+            $this->assertTrue($p->checkVocabularyValue('foo'), $k);
+        }
     }
 
     public function testPropertyGetVocabularyValue(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
-        $v = $p->getVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL);
-        $this->assertInstanceOf(SkosConceptDesc::class, $v);
-        $this->assertNull($p->getVocabularyValue('foo'));
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
+            $v = $p->getVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL);
+            $this->assertInstanceOf(SkosConceptDesc::class, $v, $k);
+            $this->assertNull($p->getVocabularyValue('foo'), $k);
 
-        $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
-        $this->assertNull($p->getVocabularyValue('foo'));
+            $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasTitle'];
+            $this->assertNull($p->getVocabularyValue('foo'), $k);
+        }
     }
 
     public function testPropertyByClassUri(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $p = $o->getProperty('https://vocabs.acdh.oeaw.ac.at/schema#Collection', 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
-        $this->assertEquals('Contact(s)', $p->label['en']);
+        foreach ($this->getOntologies() as $k => $o) {
+            $p = $o->getProperty('https://vocabs.acdh.oeaw.ac.at/schema#Collection', 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+            $this->assertEquals('Contact(s)', $p->label['en'], $k);
+        }
     }
 
     public function testPropertyWithoutClass(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $p = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
-        $this->assertEquals('Contact(s)', $p->label['en']);
+        foreach ($this->getOntologies() as $k => $o) {
+            $p = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
+            $this->assertEquals('Contact(s)', $p->label['en'], $k);
+        }
     }
 
     public function testCache(): void {
-        $this->assertFileDoesNotExist(self::CACHE_FILE);
-
-        $t1     = microtime(true);
-        $o1     = new Ontology(self::$pdo, self::$schema, self::CACHE_FILE, 10);
-        $t1     = microtime(true) - $t1;
-        $this->assertFileExists(self::CACHE_FILE);
-        $mtime1 = filemtime(self::CACHE_FILE);
-
-        $t2 = microtime(true);
-        $o2 = new Ontology(self::$pdo, self::$schema, self::CACHE_FILE, 10);
-        $t2 = microtime(true) - $t2;
-        $this->assertEquals($mtime1, filemtime(self::CACHE_FILE));
-
-        sleep(2);
-
-        $t3 = microtime(true);
-        $o3 = new Ontology(self::$pdo, self::$schema, self::CACHE_FILE, 1);
-        $t3 = microtime(true) - $t3;
-        $this->assertGreaterThan($mtime1, filemtime(self::CACHE_FILE));
-
-        $c    = 'https://vocabs.acdh.oeaw.ac.at/schema#Collection';
-        $p    = 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense';
-        $p1   = $o1->getProperty($c, $p);
-        $p2   = $o2->getProperty($c, $p);
-        $p3   = $o3->getProperty($c, $p);
-        $attr = [
-            'id', 'uri', 'label', 'comment', // BaseDesc
-            'property', 'type', 'domain', 'properties', 'range', 'min', 'max', 'recommendedClass',
-            'automatedFill', 'defaultValue', 'langTag', 'ordering', 'vocabs'
+        $getters = [
+            'db'   => fn($t) => Ontology::factoryDb(self::$pdo, self::$schema, self::CACHE_FILE, $t),
+            'rest' => fn($t) => Ontology::factoryRest('http://127.0.0.1/api', self::CACHE_FILE, $t),
         ];
-        foreach ($attr as $i) {
-            $this->assertEqualsCanonicalizing($p1->$i, $p2->$i);
-            $this->assertEqualsCanonicalizing($p1->$i, $p3->$i);
-        }
+        foreach ($getters as $k => $getter) {
+            $this->assertFileDoesNotExist(self::CACHE_FILE);
 
-        $v1 = $p1->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL);
-        $this->assertEquals($v1, $p2->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
-        $this->assertEquals($v1, $p3->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL));
+            $t1     = microtime(true);
+            $o1     = $getter(10);
+            $t1     = microtime(true) - $t1;
+            $this->assertFileExists(self::CACHE_FILE, $k);
+            clearstatcache();
+            $mtime1 = filemtime(self::CACHE_FILE);
+
+            $t2 = microtime(true);
+            $o2 = $getter(10);
+            $t2 = microtime(true) - $t2;
+            $this->assertEquals($mtime1, filemtime(self::CACHE_FILE), $k);
+
+            sleep(2);
+
+            $t3 = microtime(true);
+            $o3 = $getter(1);
+            $t3 = microtime(true) - $t3;
+            clearstatcache();
+            $this->assertGreaterThan($mtime1, filemtime(self::CACHE_FILE), $k);
+
+            $c    = 'https://vocabs.acdh.oeaw.ac.at/schema#Collection';
+            $p    = 'https://vocabs.acdh.oeaw.ac.at/schema#hasLicense';
+            $p1   = $o1->getProperty($c, $p);
+            $p2   = $o2->getProperty($c, $p);
+            $p3   = $o3->getProperty($c, $p);
+            $attr = [
+                'id', 'uri', 'label', 'comment', // BaseDesc
+                'property', 'type', 'domain', 'properties', 'range', 'min', 'max',
+                'recommendedClass',
+                'automatedFill', 'defaultValue', 'langTag', 'ordering', 'vocabs'
+            ];
+            foreach ($attr as $i) {
+                $this->assertEqualsCanonicalizing($p1->$i, $p2->$i, $k);
+                $this->assertEqualsCanonicalizing($p1->$i, $p3->$i, $k);
+            }
+
+            $v1 = $p1->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL);
+            $this->assertEquals($v1, $p2->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL), $k);
+            $this->assertEquals($v1, $p3->checkVocabularyValue('Public Domain Mark 1.0', Ontology::VOCABSVALUE_PREFLABEL), $k);
+
+            unlink(self::CACHE_FILE);
+        }
     }
 
     public function testGetClasses(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $c = $o->getClasses();
-        $this->assertGreaterThan(0, count($c));
-        $this->assertInstanceOf(ClassDesc::class, $c[0]);
+        foreach ($this->getOntologies() as $k => $o) {
+            $c = $o->getClasses();
+            $this->assertGreaterThan(0, count($c), $k);
+            $this->assertInstanceOf(ClassDesc::class, $c[0], $k);
+        }
     }
 
     public function testGetProperties(): void {
-        $o = new Ontology(self::$pdo, self::$schema);
-        $p = $o->getProperties();
-        $this->assertGreaterThan(0, count($p));
-        $this->assertInstanceOf(PropertyDesc::class, $p[0]);
+        foreach ($this->getOntologies() as $k => $o) {
+            $p = $o->getProperties();
+            $this->assertGreaterThan(0, count($p), $k);
+            $this->assertInstanceOf(PropertyDesc::class, $p[0], $k);
+        }
     }
 }

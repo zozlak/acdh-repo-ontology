@@ -81,8 +81,8 @@ class BaseDesc {
         if ($d !== null) {
             $rc = new ReflectionClass(static::class);
             foreach ($rc->getProperties() as $k) {
-                $k = $k->name;
-                $dk = strtolower($k);
+                $k  = $k->name;
+                $dk = isset($d->$k) ? $k : strtolower($k);
                 if (isset($d->$dk)) {
                     if (is_array($this->$k ?? null) && !is_array($d->$dk)) {
                         $this->$k = json_decode($d->$dk, true);
