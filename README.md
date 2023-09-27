@@ -19,14 +19,17 @@ https://acdh-oeaw.github.io/arche-docs/devdocs/namespaces/acdhoeaw-arche-lib-sch
 ## Usage
 
 ```php
+// if we can set up a direct database connection - this will provide faster 
+// initialization and vocabulary value checks
 $conn = new PDO('pgsql: repo db connection details');
 $cfg = (object) [
     'ontologyNamespace' => 'https://vocabs.acdh.oeaw.ac.at/schema#',
     'parent'            => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
     'label'             => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
 ];
-
-$ontology = new \acdhOeaw\arche\lib\schema\Ontology($conn, $cfg);
+$ontology = new \acdhOeaw\arche\lib\schema\Ontology::faactoryDb($conn, $cfg);
+// or just from the ARCHE API URL - slower but always works
+$ontology = new \acdhOeaw\arche\lib\schema\Ontology::faactoryRest('https://arche.acdh.oeaw.ac.at');
 
 $class = $ontology->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Person');
 print_r($class);
@@ -46,4 +49,5 @@ echo $property->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/c
 ```
 
 // store cache in ontology.cache and refresh it every 600s
-$ontology = new \acdhOeaw\arche\lib\schema\Ontology($conn, $cfg, 'ontology.cache', 600);
+$ontology = new \acdhOeaw\arche\lib\schema\Ontology::factoryDb($conn, $cfg, 'ontology.cache', 600);
+$ontology = new \acdhOeaw\arche\lib\schema\Ontology::factoryRest('https://arche.acdh.oeaw.ac.at', 'ontology.cache', 600);
