@@ -30,8 +30,9 @@ use PDO;
 use SplObjectStorage;
 use OutOfBoundsException;
 use RuntimeException;
-use EasyRdf\Resource;
 use rdfInterface\LiteralInterface;
+use rdfInterface\DatasetNodeInterface;
+use rdfInterface\NamedNodeInterface;
 use termTemplates\QuadTemplate as QT;
 use termTemplates\PredicateTemplate as PT;
 use quickRdf\DataFactory as DF;
@@ -183,12 +184,21 @@ class Ontology {
      * Checks if a given RDF resource is of a given class taking into account
      * ontology class inheritance.
      * 
-     * @param Resource $res
-     * @param string $class
+     * @param DatasetNodeInterface|array<string>|string $resClassOrClassArray
+     * @param string|NamedNodeInterface $class
      * @return bool
      */
-    public function isA(Resource $res, string $class): bool {
-        foreach ($res->allResources(RDF::RDF_TYPE) as $t) {
+    public function isA(DatasetNodeInterface | array | string $resClassOrClassArray,
+                        string | NamedNodeInterface $class): bool {
+        $class = (string) $class;
+        if ($resClassOrClassArray instanceof DatasetNodeInterface) {
+            $classes = $resClassOrClassArray->listObjects(new PT(DF::namedNode(RDF::RDF_TYPE)))->getValues();
+        } elseif (!is_array($resClassOrClassArray)) {
+            $classes = [$resClassOrClassArray];
+        } else {
+            $classes = $resClassOrClassArray;
+        }
+        foreach ($classes as $t) {
             $t = (string) $t;
             if ($t === $class) {
                 return true;
@@ -203,11 +213,11 @@ class Ontology {
     /**
      * Returns class description.
      * 
-     * @param string $class class name URI
+     * @param string|NamedNodeInterface $class class name URI
      * @return ClassDesc|null
      */
-    public function getClass(string $class): ?ClassDesc {
-        return $this->classes[$class] ?? null;
+    public function getClass(string | NamedNodeInterface $class): ?ClassDesc {
+        return $this->classes[(string) $class] ?? null;
     }
 
     /**
@@ -223,21 +233,22 @@ class Ontology {
      * and a first encounterred match is returned (property cardinality and 
      * range may vary between classes).
      * 
-     * @param Resource | array<string> | string | null $resOrClassesArray an RDF resource or an 
+     * @param DatasetNodeInterface|array<string>|string|null $resClassOrClassArray an RDF resource or an 
      *   array of RDF class URIs or an RDF class URI
-     * @param string $property property URI
+     * @param string|NamedNodeInterface $property property URI
      * @return PropertyDesc|null
      */
-    public function getProperty(Resource | array | string | null $resOrClassesArray,
-                                string $property): ?PropertyDesc {
-        if (empty($resOrClassesArray)) {
-            $resOrClassesArray = [];
-        } elseif ($resOrClassesArray instanceof Resource) {
-            $resOrClassesArray = $resOrClassesArray->allResources(RDF::RDF_TYPE);
-        } elseif (!is_array($resOrClassesArray)) {
-            $resOrClassesArray = [$resOrClassesArray];
+    public function getProperty(DatasetNodeInterface | array | string | null $resClassOrClassArray,
+                                string | NamedNodeInterface $property): ?PropertyDesc {
+        $property = (string) $property;
+        if ($resClassOrClassArray instanceof DatasetNodeInterface) {
+            $classes = $resClassOrClassArray->listObjects(new PT(DF::namedNode(RDF::RDF_TYPE)))->getValues();
+        } elseif (!is_array($resClassOrClassArray)) {
+            $classes = empty($resClassOrClassArray) ? [] : [$resClassOrClassArray];
+        } else {
+            $classes = $resClassOrClassArray;
         }
-        foreach ($resOrClassesArray as $class) {
+        foreach ($classes as $class) {
             $class = (string) $class;
             if (isset($this->classes[$class]) && isset($this->classes[$class]->properties[$property])) {
                 return $this->classes[$class]->properties[$property];
@@ -675,8 +686,7 @@ class Ontology {
                 $objects[$sbj]->min = $obj->getValue();
                 $objects[$sbj]->max = $obj->getValue();
             } elseif ($pred === 'ids') {
-                $objects[$obj->getValue()] = $objects[$sbj];
-                $objects[$sbj]->ids[]      = $obj->getValue();
+                $objects[$sbj]->ids[] = $obj->getValue();
             } elseif ($obj instanceof LiteralInterface) {
                 $objects[$sbj]->$pred[$obj->getLang()] = $obj->getValue();
             } else {

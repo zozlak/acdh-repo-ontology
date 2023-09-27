@@ -19,7 +19,6 @@
     "require": {
         "php": ">= 8",
         "zozlak/rdf-constants": "^1",
-        "acdh-oeaw/easyrdf": "*",
         "sweetrdf/rdf-interface": "^2.0.0-RC6",
         "sweetrdf/quick-rdf": "dev-master",
         "sweetrdf/quick-rdf-io": "dev-master",

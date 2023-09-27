@@ -29,7 +29,8 @@ namespace acdhOeaw\arche\lib\schema;
 use PDO;
 use ReflectionClass;
 use ReflectionProperty;
-use EasyRdf\Graph;
+use quickRdf\DataFactory as DF;
+use quickRdf\DatasetNode;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -103,20 +104,22 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testClassInheritance(): void {
+        $sbj  = DF::namedNode('.');
+        $pred = DF::namedNode(RDF::RDF_TYPE);
         foreach ($this->getOntologies() as $k => $o) {
-            $r1 = (new Graph())->resource('.');
-            $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $r1 = new DatasetNode($sbj);
+            $r1->add(DF::quad($sbj, $pred, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/schema#Collection')));
             $this->assertTrue($o->isA($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'), $k);
 
-            $r2 = (new Graph())->resource('.');
-            $r2->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
+            $r2 = new DatasetNode(DF::namedNode('.'));
+            $r2->add(DF::quad($sbj, $pred, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent')));
             $this->assertTrue($o->isA($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'), $k);
 
-            $r3 = (new Graph())->resource('.');
-            $r3->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#Agent');
+            $r3 = new DatasetNode(DF::namedNode('.'));
+            $r3->add(DF::quad($sbj, $pred, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/schema#Agent')));
             $this->assertFalse($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'), $k);
 
-            $r3->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject');
+            $r3->add(DF::quad($sbj, $pred, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject')));
             $this->assertTrue($o->isA($r3, 'https://vocabs.acdh.oeaw.ac.at/schema#RepoObject'), $k);
         }
     }
@@ -159,14 +162,16 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testCardinalitiesDirect(): void {
+        $sbj  = DF::namedNode('.');
+        $pred = DF::namedNode(RDF::RDF_TYPE);
         foreach ($this->getOntologies() as $k => $o) {
-            $r1 = (new Graph())->resource('.');
-            $r1->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#TopCollection');
+            $r1 = new DatasetNode($sbj);
+            $r1->add(DF::quad($sbj, $pred, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/schema#TopCollection')));
             $p1 = $o->getProperty($r1, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
             $this->assertEquals(1, $p1->min, $k);
 
-            $r2 = (new Graph())->resource('.');
-            $r2->addResource(RDF::RDF_TYPE, 'https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent');
+            $r2 = new DatasetNode($sbj);
+            $r2->add(DF::quad($sbj, $pred, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/schema#BinaryContent')));
             $p2 = $o->getProperty($r2, 'https://vocabs.acdh.oeaw.ac.at/schema#hasContact');
             $this->assertNull($p2->min, $k);
 
@@ -176,8 +181,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
 
     public function testPropertyDomainRange(): void {
         foreach ($this->getOntologies() as $k => $o) {
-            $r = (new Graph())->resource('.');
-            $p = $o->getProperty($r, 'https://vocabs.acdh.oeaw.ac.at/schema#hasAcceptedDate');
+            $p = $o->getProperty(null, 'https://vocabs.acdh.oeaw.ac.at/schema#hasAcceptedDate');
             $this->assertContains('http://www.w3.org/2001/XMLSchema#date', $p->range, $k);
             $this->assertContains('https://vocabs.acdh.oeaw.ac.at/schema#RepoObject', $p->domain, $k);
         }
