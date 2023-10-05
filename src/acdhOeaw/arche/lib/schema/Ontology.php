@@ -275,6 +275,23 @@ class Ontology {
     }
 
     /**
+     * Returns all classes in the given ontology namespace as an associative
+     * array with keys being class URIs in the ontology namespace.
+     * 
+     * @return array<string, ClassDesc>
+     */
+    public function getNamespaceClasses(): array {
+        $nmsp    = $this->getNamespace();
+        $classes = [];
+        foreach ($this->classes as $uri => $class) {
+            if (str_starts_with($uri, $nmsp)) {
+                $classes[$uri] = $class;
+            }
+        }
+        return $classes;
+    }
+
+    /**
      * Returns all properties defined in the ontology.
      * 
      * Property defintions read that way lack cardinality info as the cardinality
