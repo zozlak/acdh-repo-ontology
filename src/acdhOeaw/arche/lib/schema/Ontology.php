@@ -167,6 +167,10 @@ class Ontology {
      */
     private array $restrictions = [];
 
+    public function getNamespace(): string {
+        return (string) ($this->schema->ontologyNamespace ?? $this->schema->namespaces?->ontology);
+    }
+
     public function saveCache(string $path): void {
         $toSerialize = [
             $this->classes, $this->classesRev,
