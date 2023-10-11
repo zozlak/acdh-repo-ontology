@@ -29,7 +29,7 @@ $cfg = (object) [
 ];
 $ontology = \acdhOeaw\arche\lib\schema\Ontology::factoryDb($conn, $cfg);
 // or just from the ARCHE API URL - slower but always works
-$ontology = \acdhOeaw\arche\lib\schema\Ontology::factoryRest('https://arche.acdh.oeaw.ac.at');
+$ontology = \acdhOeaw\arche\lib\schema\Ontology::factoryRest('https://arche.acdh.oeaw.ac.at/api');
 
 $class = $ontology->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Person');
 print_r($class);
