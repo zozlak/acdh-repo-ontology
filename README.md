@@ -27,9 +27,9 @@ $cfg = (object) [
     'parent'            => 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf',
     'label'             => 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle',
 ];
-$ontology = new \acdhOeaw\arche\lib\schema\Ontology::faactoryDb($conn, $cfg);
+$ontology = \acdhOeaw\arche\lib\schema\Ontology::factoryDb($conn, $cfg);
 // or just from the ARCHE API URL - slower but always works
-$ontology = new \acdhOeaw\arche\lib\schema\Ontology::faactoryRest('https://arche.acdh.oeaw.ac.at');
+$ontology = \acdhOeaw\arche\lib\schema\Ontology::factoryRest('https://arche.acdh.oeaw.ac.at');
 
 $class = $ontology->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Person');
 print_r($class);
