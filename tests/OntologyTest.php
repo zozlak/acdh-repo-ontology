@@ -77,8 +77,9 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
      */
     private function getOntologies(): array {
         return [
-            'db'   => Ontology::factoryDb(self::$pdo, self::$schema),
-            'rest' => Ontology::factoryRest('http://127.0.0.1/api'),
+            'db'    => Ontology::factoryDb(self::$pdo, self::$schema),
+            'rest'  => Ontology::factoryRest('http://127.0.0.1/api'),
+            'arche' => Ontology::factoryRest('https://arche.acdh.oeaw.ac.at/api'),
         ];
     }
 
@@ -125,11 +126,34 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testClassGetProperties(): void {
+        $n1 = $n2 = $n3 = null;
         foreach ($this->getOntologies() as $k => $o) {
-            $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
-            $p = $c->getProperties();
+            $c  = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
+            $p  = $c->getProperties();
+            $n1 ??= count($p);
+            $this->assertGreaterThan(0, count($p), $k);
+            $this->assertEquals($n1, count($p), $k);
             $this->assertEquals(count(array_unique(array_map('spl_object_id', $p))), count($p), $k);
             $this->assertEquals(count(array_unique(array_map('spl_object_id', $c->properties))), count($p), $k);
+
+            // https://vocabs.acdh.oeaw.ac.at/schema#Project and http://xmlns.com/foaf/0.1/Project are owl:equivalentClass
+            // which caused a lot of trouble in the past
+            $c  = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Project');
+            $p  = $c->getProperties();
+            $n2 ??= count($p);
+            $this->assertGreaterThan(0, count($p), $k);
+            $this->assertEquals($n2, count($p), $k);
+            $this->assertEquals(count(array_unique(array_map('spl_object_id', $p))), count($p), $k);
+            $this->assertEquals(count(array_unique(array_map('spl_object_id', $c->properties))), count($p), $k);
+
+            $c2 = $o->getClass('http://xmlns.com/foaf/0.1/Project');
+            $this->assertEmpty(array_intersect($c->class, $c2->class));
+            $p  = $c2->getProperties();
+            $n3 ??= count($p);
+            $this->assertGreaterThan(0, count($p), $k);
+            $this->assertEquals($n3, count($p), $k);
+            $this->assertEquals(count(array_unique(array_map('spl_object_id', $p))), count($p), $k);
+            $this->assertEquals(count(array_unique(array_map('spl_object_id', $c2->properties))), count($p), $k);
         }
     }
 

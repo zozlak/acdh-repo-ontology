@@ -448,8 +448,8 @@ class Ontology {
 
     private function loadClassesDb(): void {
         $query = "
-            WITH RECURSIVE t(pid, id, n) AS (
-                SELECT DISTINCT id, id, 0
+            WITH RECURSIVE t(pid, id) AS (
+                SELECT DISTINCT id, id
                 FROM
                     identifiers
                     JOIN metadata USING (id)
@@ -457,13 +457,13 @@ class Ontology {
                     property = ?
                     AND substring(value, 1, 1000) = ?
               UNION
-                SELECT r.target_id, t.id, t.n + 1
+                SELECT r.target_id, t.id
                 FROM
                     relations r 
-                    JOIN t ON t.pid = r.id AND (property = ? OR property = ?)
+                    JOIN t ON t.pid = r.id AND property = ? 
             ),
             tt AS (
-                SELECT id, json_agg(pid ORDER BY n DESC) AS pids
+                SELECT id, jsonb_agg(pid ORDER BY pid) AS pids
                 FROM t
                 GROUP BY 1
             )
@@ -495,7 +495,7 @@ class Ontology {
         ";
         $param = [
             RDF::RDF_TYPE, RDF::OWL_CLASS, // with non-recursive
-            RDF::RDFS_SUB_CLASS_OF, RDF::OWL_EQUIVALENT_CLASS, // with recursive
+            RDF::RDFS_SUB_CLASS_OF, // with recursive
             RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c3 (label), c4 (comment)
         ];
         //exit("\n".(new \zozlak\queryPart\QueryPart($query, $param))."\n");
@@ -533,8 +533,8 @@ class Ontology {
         $anPropSql   = substr(str_repeat('?, ', count($anPropParam)), 0, -2);
 
         $query = "
-            WITH RECURSIVE t(pid, id, type, n) AS (
-                SELECT DISTINCT id, id, value, 0
+            WITH RECURSIVE t(pid, id, type) AS (
+                SELECT DISTINCT id, id, value
                 FROM 
                     identifiers
                     JOIN metadata USING (id)
@@ -542,13 +542,13 @@ class Ontology {
                     property = ?    
                     AND substring(value, 1, 1000) IN (?, ?)
               UNION
-                SELECT r.target_id, t.id, t.type, t.n + 1
+                SELECT r.target_id, t.id, t.type
                 FROM
                     relations r 
-                    JOIN t ON t.pid = r.id AND (property = ? OR property = ?) AND n < 30
+                    JOIN t ON t.pid = r.id AND property = ?
             ),
             tt AS (
-                SELECT id, type, json_agg(pid ORDER BY n DESC) AS pids
+                SELECT id, type, jsonb_agg(pid ORDER BY pid) AS pids
                 FROM t
                 GROUP BY 1, 2
             )
@@ -561,17 +561,17 @@ class Ontology {
                     GROUP BY 1
                 ) c1 USING (id)
                 JOIN (
-                    SELECT t.id, json_agg(ids ORDER BY n DESC, ids) AS properties 
+                    SELECT t.id, jsonb_agg(ids ORDER BY ids) AS properties 
                     FROM t JOIN identifiers i ON t.pid = i.id
                     GROUP BY 1
                 ) c2 USING (id)
                 LEFT JOIN (
-                    SELECT r.id, json_agg(ids) AS range
+                    SELECT r.id, jsonb_agg(ids) AS range
                     FROM relations r JOIN identifiers i ON r.target_id = i.id AND r.property = ?
                     GROUP BY 1
                 ) c3 USING (id)
                 LEFT JOIN (
-                    SELECT r.id, json_agg(ids) AS domain
+                    SELECT r.id, jsonb_agg(ids) AS domain
                     FROM relations r JOIN identifiers i ON r.target_id = i.id AND r.property = ?
                     GROUP BY 1
                 ) c4 USING (id)
@@ -603,7 +603,7 @@ class Ontology {
         ";
         $param = [
             RDF::RDF_TYPE, RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY, // with non-recursive term
-            RDF::RDFS_SUB_PROPERTY_OF, RDF::OWL_EQUIVALENT_PROPERTY, // with recursive term
+            RDF::RDFS_SUB_PROPERTY_OF, // with recursive term
             RDF::RDFS_RANGE, RDF::RDFS_DOMAIN, // c3, c4
             RDF::SKOS_ALT_LABEL, RDF::RDFS_COMMENT, // c5, c6
         ];
@@ -660,26 +660,24 @@ class Ontology {
         $baseUrl                 = $this->repo->getBaseUrl();
         $baseUrlL                = strlen($baseUrl);
         $mapping                 = [
-            RDF::SKOS_ALT_LABEL          => 'label',
-            RDF::RDFS_COMMENT            => 'comment',
-            RDF::OWL_EQUIVALENT_CLASS    => 'ids',
-            RDF::RDFS_SUB_CLASS_OF       => 'parent',
-            RDF::OWL_EQUIVALENT_PROPERTY => 'ids',
-            RDF::RDFS_SUB_PROPERTY_OF    => 'parent',
-            RDF::RDFS_RANGE              => 'range',
-            RDF::RDFS_DOMAIN             => 'domain',
-            RDF::OWL_ON_PROPERTY         => 'onProperty',
-            RDF::OWL_CARDINALITY         => 'cardinality',
-            RDF::OWL_MIN_CARDINALITY     => 'min',
-            RDF::OWL_MAX_CARDINALITY     => 'max',
-            $idPred                      => 'ids',
-            RDF::RDF_TYPE                => 'type',
-            $nmsp . 'automatedFill'      => 'automatedFill',
-            $nmsp . 'defaultValue'       => 'defaultValue',
-            $nmsp . 'langTag'            => 'langTag',
-            $nmsp . 'ordering'           => 'ordering',
-            $nmsp . 'recommendedClass'   => 'recommendedClass',
-            $nmsp . 'vocabs'             => 'vocabs',
+            RDF::SKOS_ALT_LABEL        => 'label',
+            RDF::RDFS_COMMENT          => 'comment',
+            RDF::RDFS_SUB_CLASS_OF     => 'parent',
+            RDF::RDFS_SUB_PROPERTY_OF  => 'parent',
+            RDF::RDFS_RANGE            => 'range',
+            RDF::RDFS_DOMAIN           => 'domain',
+            RDF::OWL_ON_PROPERTY       => 'onProperty',
+            RDF::OWL_CARDINALITY       => 'cardinality',
+            RDF::OWL_MIN_CARDINALITY   => 'min',
+            RDF::OWL_MAX_CARDINALITY   => 'max',
+            $idPred                    => 'ids',
+            RDF::RDF_TYPE              => 'type',
+            $nmsp . 'automatedFill'    => 'automatedFill',
+            $nmsp . 'defaultValue'     => 'defaultValue',
+            $nmsp . 'langTag'          => 'langTag',
+            $nmsp . 'ordering'         => 'ordering',
+            $nmsp . 'recommendedClass' => 'recommendedClass',
+            $nmsp . 'vocabs'           => 'vocabs',
         ];
         $term                    = new SearchTerm(
             RDF::RDF_TYPE,
@@ -725,7 +723,7 @@ class Ontology {
             }
             $loaded->attach($obj);
             match ($obj->type ?? null) {
-                RDF::OWL_CLASS => $this->loadClassRest($obj, $nmsp),
+                RDF::OWL_CLASS => $this->loadClassRest($obj, $nmsp, $baseUrl),
                 RDF::OWL_DATATYPE_PROPERTY, RDF::OWL_OBJECT_PROPERTY => $this->loadPropertyRest($obj, $nmsp),
                 RDF::OWL_RESTRICTION => $this->loadRestrictionRest($obj, $nmsp),
                 default => null
@@ -734,10 +732,10 @@ class Ontology {
         $this->buildClassesRevIndex();
     }
 
-    private function loadClassRest(object $data, string $nmsp): void {
+    private function loadClassRest(object $data, string $nmsp, string $baseUrl): void {
         $data->class   = $data->ids;
         $data->classes = $data->ids;
-        $class         = new ClassDesc($data, $data->ids, $nmsp);
+        $class         = new ClassDesc($data, $data->ids, $nmsp, $baseUrl);
         $visited       = new SplObjectStorage();
         $visited->attach($data);
         $this->resolveParents($class, 'classes', $data->parent ?? [], $visited);

@@ -63,15 +63,17 @@ class BaseDesc {
      * 
      * @param object $d
      * @param array<string> $ids
-     * @param string $nmsp
+     * @param ?string $nmsp
+     * @param ?string $skipNmsp
      */
     public function __construct(object $d = null, array $ids = [],
-                                string $nmsp = null) {
-        $nmspL = strlen((string) $nmsp);
+                                ?string $nmsp = null, ?string $skipNmsp = null) {
         foreach ($ids as $i) {
-            if ($nmspL > 0 && substr($i, 0, $nmspL) === $nmsp) {
+            if (str_starts_with($i, $nmsp)) {
                 $this->uri = $i;
                 break;
+            } elseif (empty($this->uri) && !str_starts_with($i, $skipNmsp)) {
+                $this->uri = $i;
             }
         }
         if (empty($this->uri)) {
