@@ -292,6 +292,23 @@ class Ontology {
     }
 
     /**
+     * Returns all classes inheriting from a given one.
+     * 
+     * @param string | NamedNodeInterface | ClassDesc $class
+     * @return array<ClassDesc>
+     */
+    public function getChildClasses(string | NamedNodeInterface | ClassDesc $class): array {
+        if ($class instanceof ClassDesc) {
+            $class = $class->uri;
+        }
+        $children = new SplObjectStorage();
+        foreach ($this->classesRev[(string) $class] ?? [] as $i) {
+            $children->attach($i);
+        }
+        return iterator_to_array($children);
+    }
+
+    /**
      * Returns all properties defined in the ontology.
      * 
      * Property defintions read that way lack cardinality info as the cardinality
@@ -1012,7 +1029,7 @@ class Ontology {
         $concepts = [];
         foreach ($objects as $i) {
             $i->concept = $i->ids;
-            $concept    = new SkosConceptDesc($i, $i->ids, $nmsp);
+            $concept    = new SkosConceptDesc($i, $i->ids, $nmsp, $baseUrl);
             foreach ($concept->concept as $c) {
                 $concepts[$c] = $concept;
             }
