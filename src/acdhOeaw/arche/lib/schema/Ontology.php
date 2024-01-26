@@ -827,6 +827,9 @@ class Ontology {
         if (!empty($prop->vocabs)) {
             $prop->setOntology($this);
         }
+        if ($prop->langTag) {
+            $prop->range = [RDF::RDF_LANG_STRING];
+        }
         foreach ($prop->property as $i) {
             $this->properties[(string) $i] = $prop;
         }

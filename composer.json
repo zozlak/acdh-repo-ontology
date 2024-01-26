@@ -19,9 +19,11 @@
     "require": {
         "php": ">= 8",
         "zozlak/rdf-constants": "^1",
-        "sweetrdf/rdf-interface": "^2.0.0-RC6",
+        "sweetrdf/rdf-interface": "dev-master",
         "sweetrdf/quick-rdf": "dev-master",
         "sweetrdf/quick-rdf-io": "dev-master",
+        "sweetrdf/rdf-helpers": "dev-dev",
+        "sweetrdf/term-templates": "dev-dev",
         "acdh-oeaw/arche-lib": "dev-rdfInterface"
     },
     "require-dev": {
