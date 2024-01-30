@@ -68,6 +68,8 @@ class BaseDesc {
      */
     public function __construct(object $d = null, array $ids = [],
                                 ?string $nmsp = null, ?string $skipNmsp = null) {
+        $nmsp     ??= '';
+        $skipNmsp ??= '';
         foreach ($ids as $i) {
             if (str_starts_with($i, $nmsp)) {
                 $this->uri = $i;

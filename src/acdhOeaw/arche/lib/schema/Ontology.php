@@ -38,6 +38,7 @@ use termTemplates\PredicateTemplate as PT;
 use quickRdf\DataFactory as DF;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\Repo;
+use acdhOeaw\arche\lib\Schema;
 use acdhOeaw\arche\lib\SearchTerm;
 use acdhOeaw\arche\lib\SearchConfig;
 
@@ -86,7 +87,7 @@ class Ontology {
 
         $ontology         = new Ontology();
         $ontology->pdo    = $pdo;
-        $ontology->schema = $schema;
+        $ontology->schema = new Schema($schema);
         $ontology->loadClassesDb();
         $ontology->loadPropertiesDb();
         $ontology->loadRestrictionsDb();
@@ -134,7 +135,7 @@ class Ontology {
     }
 
     private PDO $pdo;
-    private object $schema;
+    private Schema $schema;
     private Repo $repo;
 
     /**
@@ -168,7 +169,7 @@ class Ontology {
     private array $restrictions = [];
 
     public function getNamespace(): string {
-        return (string) ($this->schema->ontologyNamespace ?? $this->schema->namespaces?->ontology);
+        return (string) ($this->schema->ontologyNamespace ?? $this->schema->namespaces->ontology);
     }
 
     public function saveCache(string $path): void {
@@ -673,7 +674,7 @@ class Ontology {
 
     private function loadRest(): void {
         $idPred                  = (string) $this->schema->id;
-        $nmsp                    = (string) $this->schema->namespaces?->ontology;
+        $nmsp                    = (string) $this->schema->namespaces->ontology;
         $baseUrl                 = $this->repo->getBaseUrl();
         $baseUrlL                = strlen($baseUrl);
         $mapping                 = [
@@ -987,7 +988,7 @@ class Ontology {
                                                ?string $conceptUri = null): array {
         $baseUrl  = $this->repo->getBaseUrl();
         $baseUrlL = strlen($baseUrl);
-        $nmsp     = (string) $this->schema->namespaces?->ontology;
+        $nmsp     = (string) $this->schema->namespaces->ontology;
         $mapping  = [
             (string) $this->schema->id    => 'ids',
             (string) $this->schema->label => 'label',
