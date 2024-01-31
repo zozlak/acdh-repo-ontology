@@ -70,14 +70,14 @@ class Ontology {
     /**
      * 
      * @param PDO $pdo
-     * @param object $schema
+     * @param Schema|\stdClass $schema
      * @param string|null $cache File storing ontology cache.
      *   If empty or null, cache isn't used.
      * @param $cacheTtl time in seconds for which the cache file is considered
      *   valid. After that time (or when the cache file doesn't exist) the
      *   cache file is regenerated.
      */
-    static public function factoryDb(PDO $pdo, object $schema,
+    static public function factoryDb(PDO $pdo, Schema | \stdClass $schema,
                                      ?string $cache = null, int $cacheTtl = 600): self {
         if (!empty($cache) && file_exists($cache) && time() - filemtime($cache) <= $cacheTtl) {
             $ontology      = self::factoryCache($cache);
@@ -87,7 +87,7 @@ class Ontology {
 
         $ontology         = new Ontology();
         $ontology->pdo    = $pdo;
-        $ontology->schema = new Schema($schema);
+        $ontology->schema = $schema instanceof Schema ? $schema : new Schema($schema);
         $ontology->loadClassesDb();
         $ontology->loadPropertiesDb();
         $ontology->loadRestrictionsDb();
@@ -521,7 +521,7 @@ class Ontology {
         $query->execute($param);
         while ($c     = $query->fetch(PDO::FETCH_OBJ)) {
             $classList = json_decode($c->class);
-            $cc        = new ClassDesc($c, $classList, $this->schema->ontologyNamespace);
+            $cc        = new ClassDesc($c, $classList, $this->getNamespace());
             foreach ($classList as $i) {
                 $this->classes[$i] = $cc;
             }
@@ -630,7 +630,7 @@ class Ontology {
         $query->execute($param);
         while ($p     = $query->fetch(PDO::FETCH_OBJ)) {
             $propList = json_decode($p->property);
-            $prop     = new PropertyDesc($p, $propList, $this->schema->ontologyNamespace);
+            $prop     = new PropertyDesc($p, $propList, $this->getNamespace());
             $this->loadPropertyCommon($prop);
         }
     }
