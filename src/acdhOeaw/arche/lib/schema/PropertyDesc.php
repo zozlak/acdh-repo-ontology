@@ -111,6 +111,13 @@ class PropertyDesc extends BaseDesc {
     public string $vocabs = '';
 
     /**
+     * 
+     * acdh:exampleValue annotation property values
+     * @var array<string, string>
+     */
+    public array $exampleValue = [];
+
+    /**
      * Array of vocabulary values fetched from vocabulary pointed by acdh:vocabs
      * annotation property
      * 
@@ -130,7 +137,7 @@ class PropertyDesc extends BaseDesc {
         return [
             'id', 'uri', 'label', 'comment', // BaseDesc
             'property', 'type', 'domain', 'properties', 'range', 'min', 'max', 'recommendedClass', // self
-            'automatedFill', 'defaultValue', 'langTag', 'ordering', 'vocabs' // self
+            'automatedFill', 'defaultValue', 'langTag', 'ordering', 'vocabs', 'exampleValue' // self
         ];
     }
 

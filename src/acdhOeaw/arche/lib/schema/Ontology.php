@@ -696,6 +696,7 @@ class Ontology {
             $nmsp . 'ordering'         => 'ordering',
             $nmsp . 'recommendedClass' => 'recommendedClass',
             $nmsp . 'vocabs'           => 'vocabs',
+            $nmsp . 'exampleValue'     => 'exampleValue',
         ];
         $term                    = new SearchTerm(
             RDF::RDF_TYPE,
