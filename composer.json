@@ -19,12 +19,10 @@
     "require": {
         "php": ">= 8",
         "zozlak/rdf-constants": "^1",
-        "sweetrdf/rdf-interface": "dev-master",
-        "sweetrdf/quick-rdf": "dev-master",
-        "sweetrdf/quick-rdf-io": "dev-master",
-        "sweetrdf/rdf-helpers": "dev-dev",
-        "sweetrdf/term-templates": "dev-dev",
-        "acdh-oeaw/arche-lib": "dev-rdfInterface"
+        "sweetrdf/rdf-interface": "^2.0.0-RC7",
+        "sweetrdf/quick-rdf": "^2.0.0-RC7",
+        "sweetrdf/rdf-helpers": "^2.0.0-RC1",
+        "acdh-oeaw/arche-lib": "^6.0.0-RC1"
     },
     "require-dev": {
         "phpunit/phpunit": "^10",
