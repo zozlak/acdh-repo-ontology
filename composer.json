@@ -19,10 +19,7 @@
     "require": {
         "php": ">= 8",
         "zozlak/rdf-constants": "^1",
-        "sweetrdf/rdf-interface": "^2.0.0-RC7",
-        "sweetrdf/quick-rdf": "^2.0.0-RC7",
-        "sweetrdf/rdf-helpers": "^2.0.0-RC1",
-        "acdh-oeaw/arche-lib": "^6.0.0-RC1"
+        "acdh-oeaw/arche-lib": "^6"
     },
     "require-dev": {
         "phpunit/phpunit": "^10",
