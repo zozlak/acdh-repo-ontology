@@ -46,8 +46,8 @@ echo $property->checkVocabularyValue('cc-by-4-0', \acdhOeaw\arche\lib\schema\Ont
 print_r($property->getVocabularyValue('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0')); // doesn't fetch  all vocabulary values
 print_r($property->vocabularyValues); // fetches all values
 echo $property->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('de'); // fetches all values first if they aren't loaded yet
-```
 
 // store cache in ontology.cache and refresh it every 600s
 $ontology = new \acdhOeaw\arche\lib\schema\Ontology::factoryDb($conn, $cfg, 'ontology.cache', 600);
 $ontology = new \acdhOeaw\arche\lib\schema\Ontology::factoryRest('https://arche.acdh.oeaw.ac.at', 'ontology.cache', 600);
+```
