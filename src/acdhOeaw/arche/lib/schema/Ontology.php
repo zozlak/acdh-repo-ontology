@@ -455,7 +455,7 @@ class Ontology {
                     FROM t JOIN identifiers i ON t.pid = i.id
                     GROUP BY 1
                 ) c2 USING (id)
-                LEFT JOIN (
+                JOIN (
                     SELECT r.id, json_agg(ids) AS range
                     FROM relations r JOIN identifiers i ON r.target_id = i.id AND r.property = ?
                     GROUP BY 1
