@@ -583,7 +583,7 @@ class Ontology {
                     FROM t JOIN identifiers i ON t.pid = i.id
                     GROUP BY 1
                 ) c2 USING (id)
-                LEFT JOIN (
+                JOIN (
                     SELECT r.id, jsonb_agg(ids) AS range
                     FROM relations r JOIN identifiers i ON r.target_id = i.id AND r.property = ?
                     GROUP BY 1
@@ -767,11 +767,12 @@ class Ontology {
     private function loadPropertyRest(object $data, string $nmsp): void {
         $data->property   = $data->ids;
         $data->properties = $data->ids;
+        if (!isset($data->range)) {
+            return;
+        }
+        $data->range = array_unique(array_merge(...array_map(fn($x) => $x->ids, $data->range)));
         if (isset($data->domain)) {
             $data->domain = array_unique(array_merge(...array_map(fn($x) => $x->ids, $data->domain)));
-        }
-        if (isset($data->range)) {
-            $data->range = array_unique(array_merge(...array_map(fn($x) => $x->ids, $data->range)));
         }
         if (isset($data->recommendedClass)) {
             $data->recommendedClass = array_unique(array_merge(...array_map(fn($x) => $x->ids, $data->recommendedClass)));
