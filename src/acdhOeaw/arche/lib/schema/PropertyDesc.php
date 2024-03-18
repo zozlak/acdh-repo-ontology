@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\arche\lib\schema;
 
+use zozlak\RdfConstants as RDF;
+
 /**
  * A container for an RDF property description
  *
@@ -98,7 +100,7 @@ class PropertyDesc extends BaseDesc {
     /**
      * acdh:langTag annotation property value
      */
-    public bool $langTag = false;
+    public bool $langTag;
 
     /**
      * achd:ordering annotation property value
@@ -127,6 +129,20 @@ class PropertyDesc extends BaseDesc {
      */
     private ?array $vocabularyValues;
     private Ontology $ontologyObj;
+
+    /**
+     * 
+     * @param object $d
+     * @param array<string> $ids
+     * @param ?string $nmsp
+     * @param ?string $skipNmsp
+     */
+    public function __construct(object $d = null, array $ids = [],
+                                ?string $nmsp = null, ?string $skipNmsp = null) {
+        parent::_construct($d, $ids, $nmsp, $skipNmsp);
+
+        $this->langTag = in_array(RDF::RDF_LANG_STRING, $this->range);
+    }
 
     public function setOntology(Ontology $ontology): void {
         $this->ontologyObj = $ontology;
