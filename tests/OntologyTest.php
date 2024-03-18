@@ -266,6 +266,7 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
         $t3 = microtime(true);
         $o3 = new Ontology(self::$pdo, self::$schema, self::CACHE_FILE, 1);
         $t3 = microtime(true) - $t3;
+        clearstatcache();
         $this->assertGreaterThan($mtime1, filemtime(self::CACHE_FILE));
 
         $c    = 'https://vocabs.acdh.oeaw.ac.at/schema#Collection';

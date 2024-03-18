@@ -95,7 +95,7 @@ class BaseDesc {
                 foreach (json_decode($d->annotations) as $a) {
                     $prop = preg_replace('|^.*[#/]|', '', $a->property);
                     if (property_exists($this, $prop)) {
-                        if (is_array($this->$prop)) {
+                        if (is_array($this->$prop ?? null)) {
                             if (!empty($a->lang)) {
                                 $this->$prop[$a->lang] = $a->value ?? '';
                             } else {
