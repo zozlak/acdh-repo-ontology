@@ -692,7 +692,6 @@ class Ontology {
             RDF::RDF_TYPE              => 'type',
             $nmsp . 'automatedFill'    => 'automatedFill',
             $nmsp . 'defaultValue'     => 'defaultValue',
-            $nmsp . 'langTag'          => 'langTag',
             $nmsp . 'ordering'         => 'ordering',
             $nmsp . 'recommendedClass' => 'recommendedClass',
             $nmsp . 'vocabs'           => 'vocabs',
@@ -717,7 +716,7 @@ class Ontology {
             if (!isset($objects[$sbj])) {
                 $objects[$sbj] = (object) ['id' => (int) substr($sbj, $baseUrlL)];
             }
-            if (in_array($pred, ['type', 'automatedFill', 'defaultValue', 'langTag',
+            if (in_array($pred, ['type', 'automatedFill', 'defaultValue',
                     'ordering', 'vocabs', 'min', 'max'])) {
                 $objects[$sbj]->$pred = $obj->getValue();
             } elseif ($pred === 'cardinality') {
@@ -829,9 +828,6 @@ class Ontology {
     private function loadPropertyCommon(PropertyDesc $prop): void {
         if (!empty($prop->vocabs)) {
             $prop->setOntology($this);
-        }
-        if ($prop->langTag) {
-            $prop->range = [RDF::RDF_LANG_STRING];
         }
         foreach ($prop->property as $i) {
             $this->properties[(string) $i] = $prop;
