@@ -98,7 +98,7 @@ class PropertyDesc extends BaseDesc {
     public ?string $defaultValue = null;
 
     /**
-     * acdh:langTag annotation property value
+     * is property range http://www.w3.org/1999/02/22-rdf-syntax-ns#langString
      */
     public bool $langTag;
 
@@ -139,7 +139,7 @@ class PropertyDesc extends BaseDesc {
      */
     public function __construct(object $d = null, array $ids = [],
                                 ?string $nmsp = null, ?string $skipNmsp = null) {
-        parent::_construct($d, $ids, $nmsp, $skipNmsp);
+        parent::__construct($d, $ids, $nmsp, $skipNmsp);
 
         $this->langTag = in_array(RDF::RDF_LANG_STRING, $this->range);
     }
