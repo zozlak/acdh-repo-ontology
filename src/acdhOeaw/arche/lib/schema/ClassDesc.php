@@ -54,12 +54,12 @@ class ClassDesc extends BaseDesc {
      * a property has many URIs, it will exist under all of them - use the
      * `getProperties()` method to get a distinct list of properties).
      * 
-     * @var array<PropertyDesc>
+     * @var array<string, PropertyDesc>
      */
     public $properties = [];
 
     /**
-     * Returns distinct set of class properties
+     * Returns a distinct set of class properties
      * 
      * @return PropertyDesc[]
      * @throws OutOfBoundsException
