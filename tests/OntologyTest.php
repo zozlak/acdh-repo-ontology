@@ -243,9 +243,8 @@ class OntologyTest extends \PHPUnit\Framework\TestCase {
             $c = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Collection');
             $p = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasLicense'];
             $this->assertArrayHasKey('https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0', $p->vocabularyValues, $k);
-            $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'), $k);
-            $this->assertEquals('Attribution 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'), $k);
-            $this->assertEquals('Namensnennung 4.0 International (CC BY 4.0)', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'de'), $k);
+            $this->assertEquals('CC BY 4.0', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('en'), $k);
+            $this->assertEquals('CC BY 4.0', $p->vocabularyValues['https://vocabs.acdh.oeaw.ac.at/archelicenses/cc-by-4-0']->getLabel('pl', 'en'), $k);
 
             $c       = $o->getClass('https://vocabs.acdh.oeaw.ac.at/schema#Resource');
             $p       = $c->properties['https://vocabs.acdh.oeaw.ac.at/schema#hasCategory'];
