@@ -61,12 +61,12 @@ class BaseDesc {
 
     /**
      * 
-     * @param object $d
+     * @param ?object $d
      * @param array<string> $ids
      * @param ?string $nmsp
      * @param ?string $skipNmsp
      */
-    public function __construct(object $d = null, array $ids = [],
+    public function __construct(?object $d = null, array $ids = [],
                                 ?string $nmsp = null, ?string $skipNmsp = null) {
         $nmsp     ??= '';
         $skipNmsp ??= '';
